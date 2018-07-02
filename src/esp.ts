@@ -60,10 +60,28 @@ export class OpenOCDServer extends EventEmitter {
 		return new Promise((resolve, reject) => {
 			this.process = ChildProcess.spawn(this.initCmds, this.initArgs, this.initOptions);
 			this.process.stdout.on("data", this.onStdout.bind(this));
+			this.process.stderr.on("data", this.onStderr.bind(this));
+			this.process.on("exit", this.onExit.bind(this));
+
+			resolve();
 		})
 	}
 
+	public exit(): void {
+		if (this.process) {
+			this.process.kill();
+		}
+	}
+
+	private onExit(code: number, signal: string): void {
+		this.emit("exit", code, signal);
+	}
+
 	private onStdout(chunk: string | Buffer): void {
+
+	}
+
+	private onStderr(chunk: string | Buffer): void {
 
 	}
 }
