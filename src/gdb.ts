@@ -17,7 +17,7 @@ interface LaunchRequestArgments extends DebugProtocol.LaunchRequestArguments {
     clientExecutable: string;
 }
 
-class ESPDebugSession extends DebugSession {
+export class ESPDebugSession extends DebugSession {
     private args: LaunchRequestArgments;
     private gdbServer: OpenOCDServer;
     private gdbClient: GDBClient;
@@ -48,7 +48,7 @@ class ESPDebugSession extends DebugSession {
 
         this.gdbServer.init().then(() => {
             this.gdbClient.init();
-        })
+        }).then();
     }
 }
 

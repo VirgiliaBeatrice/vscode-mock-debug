@@ -7,6 +7,7 @@
 import * as vscode from 'vscode';
 import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken } from 'vscode';
 import { MockDebugSession } from './mockDebug';
+import { ESPDebugSession } from "./gdb";
 import * as Net from 'net';
 
 /*
@@ -34,6 +35,24 @@ export function activate(context: vscode.ExtensionContext) {
 export function deactivate() {
 	// nothing to do
 }
+
+// class ESPConfigurationProvider implements vscode.DebugConfigurationProvider {
+// 	resolveDebugConfiguration(folder: WorkspaceFolder | undefined, config: DebugConfiguration, token?: CancellationToken): ProviderResult<DebugConfiguration> {
+// 		// if launch.json is missing or empty
+// 		if (!config.type && !config.request && !config.name) {
+// 			const editor = vscode.window.activeTextEditor;
+// 			if (editor && editor.document.languageId === 'markdown') {
+// 				config.type = 'mock';
+// 				config.name = 'Launch';
+// 				config.request = 'launch';
+// 				config.program = '${file}';
+// 				config.stopOnEntry = true;
+// 			}
+// 		}
+
+// 		return config;
+// 	}
+// }
 
 class MockConfigurationProvider implements vscode.DebugConfigurationProvider {
 
@@ -70,6 +89,7 @@ class MockConfigurationProvider implements vscode.DebugConfigurationProvider {
 				// start listening on a random port
 				this._server = Net.createServer(socket => {
 					const session = new MockDebugSession();
+					// const session = new ESPDebugSession();
 					session.setRunAsServer(true);
 					session.start(<NodeJS.ReadableStream>socket, socket);
 				}).listen(0);

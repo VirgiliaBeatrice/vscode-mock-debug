@@ -28,10 +28,14 @@ export class GDBClient extends EventEmitter {
 	// 	})
 	// }
 
-	public init(): void {
+	public init(): Thenable<any> {
 		this.process = ChildProcess.spawn(this._initCmds, this._initArgs);
 		this.process.stdout.on("data", this._onStdout.bind(this));
 		this.process.stderr.on("data", this._onStderr.bind(this));
+
+		return new Promise((resolve, reject) => {
+			resolve();
+		})
 	}
 
 	private get _initCmds(): string {
