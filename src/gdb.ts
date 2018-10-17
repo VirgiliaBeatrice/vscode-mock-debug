@@ -1,7 +1,7 @@
 import { LoggingDebugSession, DebugSession, StoppedEvent, InitializedEvent } from "vscode-debugadapter";
 import { DebugProtocol } from "vscode-debugprotocol";
 import { OpenOCDServer } from "./esp";
-import { GDBClient } from "./client";
+import { GDBClient } from "./openocd";
 
 
 /* interface AttachRequestArgments extends DebugProtocol.AttachRequestArguments {

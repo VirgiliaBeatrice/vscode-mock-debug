@@ -1,6 +1,10 @@
 import { DebugProtocol } from "vscode-debugprotocol";
 import { EventEmitter } from "events";
 import * as ChildProcess from "child_process";
+import { DebugSession, TerminatedEvent } from "vscode-debugadapter";
+import { GDBServer } from "./backend/gdb";
+import { GDBServerController, ConfigurationArgs } from "./controller/gdb";
+import { OpenOCDServerController } from "./controller/openocd";
 
 export interface OpenOCDArgments {
 	cwd: string;
@@ -9,79 +13,66 @@ export interface OpenOCDArgments {
 	configFiles: string[];
 }
 
-export class OpenOCDServer extends EventEmitter {
-	public name: string = "OpenOCD-ESP";
-	public ports: { [name: string]: number };
-	public args: OpenOCDArgments;
+export class ESPDebugSession extends DebugSession {
+	private server: GDBServer;
+	private args: ConfigurationArgs;
+	private port: number;
 
-	private process: ChildProcess.ChildProcess;
-	private outBuffer: string = '';
-	private errBuffer: string = '';
+	private controller: GDBServerController;
 
-	public setPorts(ports: { [name: string]: number }): void {
-		this.ports = ports;
+	protected quit: boolean;
+	protected started: boolean;
+	protected debugReady: boolean;
+	protected stopped: boolean;
+
+	public constructor() {
+		super();
+
+		this.setDebuggerLinesStartAt1(false);
+		this.setDebuggerColumnsStartAt1(false);
 	}
 
-	public setArgs(args: OpenOCDArgments): void {
+	protected initializeRequest(response: DebugProtocol.InitializeResponse, args: DebugProtocol.InitializeRequestArguments): void {
+		response.body.supportsRestartRequest = true;
+
+		this.sendResponse(response);
+	}
+
+	protected launchRequest(response: DebugProtocol.LaunchResponse, args: ConfigurationArgs): void {
 		this.args = args;
+		this.controller = new OpenOCDServerController(this.port);
+		// this.controller.on('event', this.controllerEvent.bind(this));
+
+		const serverExecutable = "executable path";
+		const serverArgs = [];
+		const initMatchRegex = /a*/g;
+
+		this.quit = false;
+		this.started = false;
+		this.debugReady = false;
+		this.stopped = false;
+
+		this.server = new GDBServer(serverExecutable, serverArgs, initMatchRegex);
+		this.server.on('quit', this.onQuit.bind(this));
+		this.server.on('launcherror', this.onLaunchError.bind(this));
+
 	}
 
-	private get initCmds(): string {
-		const cmds = [
-			this.args.cwd,
-			this.args.executable
-		];
-
-		return cmds.join("");
-	}
-
-	private get initArgs(): string[] {
-		const args = [
-			"-s",
-			this.args.searchDir,
-		];
-
-		this.args.configFiles.forEach(element => {
-			args.push("-f", element);
-		});
-
-		return args;
-	}
-
-	private get initOptions(): object {
-		const options = {
-			cwd: this.args.cwd,
-		};
-
-		return options;
-	}
-
-	public init(): Thenable<any> {
-		return new Promise((resolve, reject) => {
-			this.process = ChildProcess.spawn(this.initCmds, this.initArgs, this.initOptions);
-			this.process.stdout.on("data", this.onStdout.bind(this));
-			this.process.stderr.on("data", this.onStderr.bind(this));
-			this.process.on("exit", this.onExit.bind(this));
-
-			resolve();
-		})
-	}
-
-	public exit(): void {
-		if (this.process) {
-			this.process.kill();
+	protected onQuit(response) {
+		if (this.started) {
+			this.started = false;
+			this.sendEvent(new TerminatedEvent(false));
+		}
+		else {
+			this.sendErrorResponse(
+				response,
+				103,
+				`${this.controller.name} GDB Server quit unexpectedly.`
+			);
 		}
 	}
 
-	private onExit(code: number, signal: string): void {
-		this.emit("exit", code, signal);
-	}
-
-	private onStdout(chunk: string | Buffer): void {
-
-	}
-
-	private onStderr(chunk: string | Buffer): void {
-
+	protected onLaunchError(err: number, response) {
+		this.sendErrorResponse(response, 103, `Fail to launch ${this.controller.name} GDB Server: ${err.toString()}`);
 	}
 }
