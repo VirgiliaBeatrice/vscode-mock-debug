@@ -8,7 +8,7 @@ export class GDBServer extends EventEmitter {
 	private initResolve: (result: boolean) => void;
 	private initReject: (error: any) => void;
 
-	constructor(private application: string, private args: string[], private initMatch: RegExp) {
+	constructor(private application: string, private args: string[]) {
 		super();
 	}
 

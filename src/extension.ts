@@ -6,8 +6,7 @@
 
 import * as vscode from 'vscode';
 import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken } from 'vscode';
-import { MockDebugSession } from './mockDebug';
-import { ESPDebugSession } from "./gdb";
+import { ESPDebugSession } from "./esp";
 import * as Net from 'net';
 
 /*
@@ -15,20 +14,20 @@ import * as Net from 'net';
  * debug adapter should run inside the extension host.
  * Please note: the test suite does no longer work in this mode.
  */
-const EMBED_DEBUG_ADAPTER = false;
 
 export function activate(context: vscode.ExtensionContext) {
 
-	context.subscriptions.push(vscode.commands.registerCommand('extension.mock-debug.getProgramName', config => {
+	context.subscriptions.push(vscode.commands.registerCommand('extension.esp32-debug.getProgramName', config =>
+	{
 		return vscode.window.showInputBox({
 			placeHolder: "Please enter the name of a markdown file in the workspace folder",
 			value: "readme.md"
 		});
 	}));
 
-	// register a configuration provider for 'mock' debug type
-	const provider = new MockConfigurationProvider()
-	context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('mock', provider));
+	// register a configuration provider for 'ESP' debug type
+	const provider = new ESPDebugConfigurationProvider()
+	context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('esp32-debug', provider));
 	context.subscriptions.push(provider);
 }
 
@@ -36,39 +35,21 @@ export function deactivate() {
 	// nothing to do
 }
 
-// class ESPConfigurationProvider implements vscode.DebugConfigurationProvider {
-// 	resolveDebugConfiguration(folder: WorkspaceFolder | undefined, config: DebugConfiguration, token?: CancellationToken): ProviderResult<DebugConfiguration> {
-// 		// if launch.json is missing or empty
-// 		if (!config.type && !config.request && !config.name) {
-// 			const editor = vscode.window.activeTextEditor;
-// 			if (editor && editor.document.languageId === 'markdown') {
-// 				config.type = 'mock';
-// 				config.name = 'Launch';
-// 				config.request = 'launch';
-// 				config.program = '${file}';
-// 				config.stopOnEntry = true;
-// 			}
-// 		}
-
-// 		return config;
-// 	}
-// }
-
-class MockConfigurationProvider implements vscode.DebugConfigurationProvider {
-
-	private _server?: Net.Server;
-
+class ESPDebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 	/**
 	 * Massage a debug configuration just before a debug session is being launched,
 	 * e.g. add all missing attributes to the debug configuration.
 	 */
-	resolveDebugConfiguration(folder: WorkspaceFolder | undefined, config: DebugConfiguration, token?: CancellationToken): ProviderResult<DebugConfiguration> {
+	resolveDebugConfiguration(folder: WorkspaceFolder | undefined, config: DebugConfiguration, token?: CancellationToken): ProviderResult<DebugConfiguration>
+	{
 
 		// if launch.json is missing or empty
-		if (!config.type && !config.request && !config.name) {
+		if (!config.type && !config.request && !config.name)
+		{
 			const editor = vscode.window.activeTextEditor;
-			if (editor && editor.document.languageId === 'markdown' ) {
-				config.type = 'mock';
+			if (editor && editor.document.languageId === 'markdown')
+			{
+				config.type = 'esp32-debug';
 				config.name = 'Launch';
 				config.request = 'launch';
 				config.program = '${file}';
@@ -76,35 +57,17 @@ class MockConfigurationProvider implements vscode.DebugConfigurationProvider {
 			}
 		}
 
-		if (!config.program) {
-			return vscode.window.showInformationMessage("Cannot find a program to debug").then(_ => {
+		if (!config.program)
+		{
+			return vscode.window.showInformationMessage("Cannot find a program to debug").then(_ =>
+			{
 				return undefined;	// abort launch
 			});
-		}
-
-		if (EMBED_DEBUG_ADAPTER) {
-			// start port listener on launch of first debug session
-			if (!this._server) {
-
-				// start listening on a random port
-				this._server = Net.createServer(socket => {
-					const session = new MockDebugSession();
-					// const session = new ESPDebugSession();
-					session.setRunAsServer(true);
-					session.start(<NodeJS.ReadableStream>socket, socket);
-				}).listen(0);
-			}
-
-			// make VS Code connect to debug server instead of launching debug adapter
-			config.debugServer = this._server.address().port;
 		}
 
 		return config;
 	}
 
-	dispose() {
-		if (this._server) {
-			this._server.close();
-		}
-	}
+	dispose() {}
 }
+
