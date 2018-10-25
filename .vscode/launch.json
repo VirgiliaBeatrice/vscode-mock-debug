@@ -22,7 +22,8 @@
 			"cwd": "${workspaceFolder}",
 			"program": "${workspaceFolder}/src/esp.ts",
 			"args": [ "--server=4711" ],
-			"outFiles": [ "${workspaceFolder}/out/**/*.js" ]
+			"outFiles": [ "${workspaceFolder}/out/**/*.js" ],
+			"trace": true
 		},
 		{
 			"type": "node",

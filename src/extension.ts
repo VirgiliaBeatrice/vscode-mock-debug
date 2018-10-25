@@ -6,8 +6,8 @@
 
 import * as vscode from 'vscode';
 import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken } from 'vscode';
-import { ESPDebugSession } from "./esp";
-import * as Net from 'net';
+// import { ESPDebugSession } from "./esp";
+// import * as Net from 'net';
 
 /*
  * Set the following compile time flag to true if the
@@ -15,20 +15,61 @@ import * as Net from 'net';
  * Please note: the test suite does no longer work in this mode.
  */
 
+class ESPDebugExtention {
+	private adapterOutputChannel: vscode.OutputChannel = undefined;
+
+	constructor(private context: vscode.ExtensionContext) {
+		context.subscriptions.push(
+			vscode.commands.registerCommand('extension.esp32-debug.getPrgramName', (config) => {
+				return vscode.window.showInputBox({
+					placeHolder: "Please enter the name of a markdown file in the workspace folder",
+					value: "readme.md"
+				})
+			})
+		);
+
+		context.subscriptions.push(
+			vscode.debug.onDidReceiveDebugSessionCustomEvent(this.onReceivedCustomEvent.bind(this))
+		);
+
+		context.subscriptions.push(
+			vscode.debug.registerDebugConfigurationProvider('esp32-debug', new ESPDebugConfigurationProvider())
+		);
+	}
+
+	private onReceivedCustomEvent(e: vscode.DebugSessionCustomEvent) {
+		if (e.event === 'adapter-output') {
+			if (!this.adapterOutputChannel) {
+				this.adapterOutputChannel = vscode.window.createOutputChannel('Adapter Output');
+			}
+
+			let output = e.body.content;
+
+			if (!output.endsWith('\n')) {
+				output += '\n';
+			}
+
+			this.adapterOutputChannel.append(output);
+		}
+	}
+}
+
+
 export function activate(context: vscode.ExtensionContext) {
+	const ext = new ESPDebugExtention(context);
 
-	context.subscriptions.push(vscode.commands.registerCommand('extension.esp32-debug.getProgramName', config =>
-	{
-		return vscode.window.showInputBox({
-			placeHolder: "Please enter the name of a markdown file in the workspace folder",
-			value: "readme.md"
-		});
-	}));
+	// context.subscriptions.push(vscode.commands.registerCommand('extension.esp32-debug.getProgramName', config =>
+	// {
+	// 	return vscode.window.showInputBox({
+	// 		placeHolder: "Please enter the name of a markdown file in the workspace folder",
+	// 		value: "readme.md"
+	// 	});
+	// }));
 
-	// register a configuration provider for 'ESP' debug type
-	const provider = new ESPDebugConfigurationProvider()
-	context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('esp32-debug', provider));
-	context.subscriptions.push(provider);
+	// // register a configuration provider for 'ESP' debug type
+	// const provider = new ESPDebugConfigurationProvider()
+	// context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('esp32-debug', provider));
+	// context.subscriptions.push(provider);
 }
 
 export function deactivate() {

@@ -1,7 +1,7 @@
 import { DebugProtocol } from "vscode-debugprotocol";
 // import { EventEmitter } from "events";
 // import * as ChildProcess from "child_process";
-import { DebugSession, TerminatedEvent, InitializedEvent } from "vscode-debugadapter";
+import { DebugSession, TerminatedEvent, InitializedEvent, Event } from "vscode-debugadapter";
 import { GDBServer } from "./backend/gdb";
 import { GDBServerController, ConfigurationArgs } from "./controller/gdb";
 import { OpenOCDServerController } from "./controller/openocd";
@@ -11,6 +11,18 @@ export interface OpenOCDArgments {
 	executable: string;
 	searchDir: string;
 	configFiles: string[];
+}
+
+export class AdapterOutputEvent extends Event {
+	public body: {
+		type: string,
+		content: string
+	}
+	public event: string;
+
+	constructor(content: string, type: string) {
+		super('adapter-output', { content: content, type: type });
+	}
 }
 
 export class ESPDebugSession extends DebugSession {
@@ -29,29 +41,29 @@ export class ESPDebugSession extends DebugSession {
 		super();
 
 		this.setDebuggerLinesStartAt1(false);
-		console.log("Start a debug session.");
 		this.setDebuggerColumnsStartAt1(false);
+
+		console.log("Start a debug session.");
 	}
 
 	protected initializeRequest(response: DebugProtocol.InitializeResponse, args: DebugProtocol.InitializeRequestArguments): void {
 		response.body.supportsRestartRequest = true;
 
+		this.sendResponse(response);
 		console.log("Send an initial information.");
 
-
-
-		this.sendResponse(response);
-		// this.sendEvent(new InitializedEvent());
+		this.sendEvent(new InitializedEvent());
+		console.log("Send an initialized event.");
 	}
 
 	protected launchRequest(response: DebugProtocol.LaunchResponse, args: ConfigurationArgs): void {
-		console.log("Get a launch request.");
 		this.args = args;
 		this.controller = new OpenOCDServerController(this.port);
 		// this.controller.on('event', this.controllerEvent.bind(this));
 
-		const serverExecutable = "C:\\msys32\\mingw32\\bin\\openocd.exe";
-		const serverArgs = [];
+		// const serverExecutable = "C:\\msys32\\mingw32\\bin\\openocd.exe";
+		const serverExecutable = "C:\\msys32\\usr\\bin\\bash.exe";
+		const serverArgs = ["-l"];
 		// const initMatchRegex = /a*/g;
 
 		this.quit = false;
@@ -61,8 +73,13 @@ export class ESPDebugSession extends DebugSession {
 
 		// TODO: Run server.
 		this.server = new GDBServer(serverExecutable, serverArgs);
+		this.server.on('output', (output) => {this.sendEvent(new AdapterOutputEvent(output, 'out'))});
 		this.server.on('quit', this.onQuit.bind(this));
 		this.server.on('launcherror', this.onLaunchError.bind(this));
+
+		this.server.init().then(() => {
+			console.info("OpenOCD server started.");
+		});
 
 		// this.controller.serverLaunchStarted();
 		// this.server.init().then(() => {
@@ -77,6 +94,7 @@ export class ESPDebugSession extends DebugSession {
 		// 2. Run server
 		// 3. Register events
 
+		console.log("Get a launch request.");
 
 	}
 

@@ -18,7 +18,7 @@ export class GDBServer extends EventEmitter {
 				this.initResolve = resolve;
 				this.initReject = reject;
 
-				this.process = ChildProcess.spawn(this.application, this.args, {});
+				this.process = ChildProcess.spawn(this.application, this.args);
 				this.process.stdout.on('data', this.onStdout.bind(this));
 				this.process.stderr.on('data', this.onStderr.bind(this));
 

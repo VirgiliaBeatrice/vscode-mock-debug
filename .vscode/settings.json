@@ -18,5 +18,11 @@
 	"javascript.format.placeOpenBraceOnNewLineForFunctions": true,
 	"typescript.format.placeOpenBraceOnNewLineForFunctions": true,
 	"typescript.format.placeOpenBraceOnNewLineForControlBlocks": true,
-	"javascript.format.placeOpenBraceOnNewLineForControlBlocks": true
+	"javascript.format.placeOpenBraceOnNewLineForControlBlocks": true,
+	"logViewer.watch": [
+		{
+			"title": "Node2 Log",
+			"pattern": "C:\\Users\\Iris\\AppData\\Local\\Temp\\vscode-node-debug2.txt"
+		}
+	]
 }
