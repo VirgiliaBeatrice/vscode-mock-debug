@@ -61,9 +61,9 @@ export class ESPDebugSession extends DebugSession {
 		this.controller = new OpenOCDServerController(this.port);
 		// this.controller.on('event', this.controllerEvent.bind(this));
 
-		// const serverExecutable = "C:\\msys32\\mingw32\\bin\\openocd.exe";
-		const serverExecutable = "C:\\msys32\\usr\\bin\\bash.exe";
-		const serverArgs = ["-l"];
+		const serverExecutable = "C:\\msys32\\mingw32\\bin\\openocd.exe";
+		// const serverExecutable = "C:\\msys32\\usr\\bin\\bash.exe";
+		const serverArgs = [];
 		// const initMatchRegex = /a*/g;
 
 		this.quit = false;

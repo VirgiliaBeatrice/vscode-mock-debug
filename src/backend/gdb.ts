@@ -1,5 +1,6 @@
 import * as ChildProcess from 'child_process';
 import { EventEmitter } from 'events';
+import * as Path from 'path';
 
 export class GDBServer extends EventEmitter {
 	private process: ChildProcess.ChildProcess;
@@ -18,7 +19,16 @@ export class GDBServer extends EventEmitter {
 				this.initResolve = resolve;
 				this.initReject = reject;
 
-				this.process = ChildProcess.spawn(this.application, this.args);
+				let env = process.env;
+				let msysRoot = "C:\\msys32";
+				let msysRelativePath = [ "mingw32\\bin", "usr\\local\\bin", "usr\\bin" ];
+
+				msysRelativePath.forEach(e => {
+					env.Path += ";" + Path.normalize(Path.join(msysRoot, e));
+				});
+				// console.info(env.Path);
+
+				this.process = ChildProcess.spawn(this.application, this.args, { env: env });
 				this.process.stdout.on('data', this.onStdout.bind(this));
 				this.process.stderr.on('data', this.onStderr.bind(this));
 
