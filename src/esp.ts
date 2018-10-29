@@ -2,9 +2,10 @@ import { DebugProtocol } from "vscode-debugprotocol";
 // import { EventEmitter } from "events";
 // import * as ChildProcess from "child_process";
 import { DebugSession, TerminatedEvent, InitializedEvent, Event } from "vscode-debugadapter";
-import { GDBServer } from "./backend/gdb";
-import { GDBServerController, ConfigurationArgs } from "./controller/gdb";
-import { OpenOCDServerController } from "./controller/openocd";
+import { BackendService } from "./backend/service";
+import { GDBServerController, LaunchConfigurationArgs } from "./controller/gdb";
+import { OpenOCDDebugController } from "./controller/openocd";
+import { GDBDebugger } from "./backend/debugger";
 
 export interface OpenOCDArgments {
 	cwd: string;
@@ -26,8 +27,9 @@ export class AdapterOutputEvent extends Event {
 }
 
 export class ESPDebugSession extends DebugSession {
-	private server: GDBServer;
-	private args: ConfigurationArgs;
+	private server: BackendService;
+	private debugger: BackendService;
+	private args: LaunchConfigurationArgs;
 	private port: number;
 
 	private controller: GDBServerController;
@@ -46,8 +48,11 @@ export class ESPDebugSession extends DebugSession {
 		console.log("Start a debug session.");
 	}
 
+	// Send capabilities
 	protected initializeRequest(response: DebugProtocol.InitializeResponse, args: DebugProtocol.InitializeRequestArguments): void {
-		response.body.supportsRestartRequest = true;
+		// response.body.supportsRestartRequest = true;
+		response.body.supportsTerminateRequest = true;
+		response.body.supportTerminateDebuggee = true;
 
 		this.sendResponse(response);
 		console.log("Send an initial information.");
@@ -56,9 +61,9 @@ export class ESPDebugSession extends DebugSession {
 		console.log("Send an initialized event.");
 	}
 
-	protected launchRequest(response: DebugProtocol.LaunchResponse, args: ConfigurationArgs): void {
+	protected launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchConfigurationArgs): void {
 		this.args = args;
-		this.controller = new OpenOCDServerController(this.port);
+		this.controller = new OpenOCDDebugController(this.port);
 		// this.controller.on('event', this.controllerEvent.bind(this));
 
 		const serverExecutable = "C:\\msys32\\mingw32\\bin\\openocd.exe";
@@ -71,11 +76,23 @@ export class ESPDebugSession extends DebugSession {
 		this.debugReady = false;
 		this.stopped = false;
 
+		// TODO: Run controller.
+		this.controller = new OpenOCDDebugController(4444);
+		this.controller.setArgs(this.args);
+
 		// TODO: Run server.
-		this.server = new GDBServer(serverExecutable, serverArgs);
+		this.server = new BackendService(
+			"Subprocess for Server Instance",
+			this.controller.serverApplication(),
+			this.controller.serverArgs()
+		);
+		// this.server = new GDBServer(this.controller.serverApplication(), this.controller.serverArgs());
 		this.server.on('output', (output) => {this.sendEvent(new AdapterOutputEvent(output, 'out'))});
 		this.server.on('quit', this.onQuit.bind(this));
 		this.server.on('launcherror', this.onLaunchError.bind(this));
+		this.server.on('exit', (code, signal) => {
+			console.log(`Server process exited. CODE: ${code} SIGNAL:  ${signal}`);
+		});
 
 		this.server.init().then(() => {
 			console.info("OpenOCD server started.");
@@ -95,7 +112,18 @@ export class ESPDebugSession extends DebugSession {
 		// 3. Register events
 
 		console.log("Get a launch request.");
+		this.sendResponse(response);
 
+	}
+
+	protected disconnectRequest(response: DebugProtocol.DisconnectResponse, args: DebugProtocol.DisconnectArguments): void {
+		this.onQuit(response);
+	}
+
+	protected terminateRequest(response: DebugProtocol.TerminateResponse, args: DebugProtocol.TerminateArguments): void {
+		this.server.exit();
+		this.sendEvent(new TerminatedEvent(false));
+		this.sendResponse(response);
 	}
 
 	protected onQuit(response) {
@@ -118,4 +146,3 @@ export class ESPDebugSession extends DebugSession {
 }
 
 DebugSession.run(ESPDebugSession);
-console.info("Just show something.");

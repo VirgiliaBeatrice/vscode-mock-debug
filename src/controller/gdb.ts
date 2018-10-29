@@ -2,7 +2,9 @@
 import { DebugProtocol } from "vscode-debugprotocol";
 import { EventEmitter } from "events";
 
-export interface ConfigurationArgs extends DebugProtocol.LaunchRequestArguments {
+export interface LaunchConfigurationArgs extends DebugProtocol.LaunchRequestArguments {
+	serverCwd: string;
+	serverExecutable: string;
 	serverArgs: string[];
 }
 
@@ -11,12 +13,13 @@ export interface GDBServerController extends EventEmitter {
 	name: string;
 
 	setPort(port: number): void;
-	setArgs(args: ConfigurationArgs): void;
+	setArgs(args: LaunchConfigurationArgs): void;
 
 	initCmds(): string[];
 	launchCmds(): string[];
 	// attachCmds(): string[];
 	restartCmds(): string[];
+	serverApplication(): string;
 	serverExecutable(): string;
 	serverArgs(): string[];
 

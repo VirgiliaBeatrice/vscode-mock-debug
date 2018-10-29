@@ -2,15 +2,42 @@ import * as ChildProcess from 'child_process';
 import { EventEmitter } from 'events';
 import * as Path from 'path';
 
-export class GDBServer extends EventEmitter {
-	private process: ChildProcess.ChildProcess;
-	private outBuffer: string = '';
-	private errBuffer: string  = '';
-	private initResolve: (result: boolean) => void;
-	private initReject: (error: any) => void;
+export interface IBackendService extends EventEmitter {
+	name: string;
+	application: string;
+	process: ChildProcess.ChildProcess;
+	outBuffer: string;
+	errBuffer: string;
 
-	constructor(private application: string, private args: string[]) {
+	initResolve: (result: boolean) => void;
+	initReject: (error: any) => void;
+
+	init: () => Thenable<any>;
+	exit: () => void;
+
+	// serverEnv: (root: string, paths: string[]) => Object;
+}
+
+export class BackendService extends EventEmitter implements IBackendService  {
+	public process: ChildProcess.ChildProcess;
+	public outBuffer: string = '';
+	public errBuffer: string  = '';
+	public initResolve: (result: boolean) => void;
+	public initReject: (error: any) => void;
+
+	constructor(public name: string, public application: string, private args?: string[], private options?: ChildProcess.SpawnOptions, private addtionalEnv?: any) {
 		super();
+
+		if (this.options === undefined) {
+			this.options = { };
+		}
+
+		if (this.addtionalEnv) {
+			this.options = {
+				env: this.serverEnv(this.addtionalEnv.root, this.addtionalEnv.relPaths)
+			};
+
+		}
 	}
 
 	public init(): Thenable<any> {
@@ -19,16 +46,7 @@ export class GDBServer extends EventEmitter {
 				this.initResolve = resolve;
 				this.initReject = reject;
 
-				let env = process.env;
-				let msysRoot = "C:\\msys32";
-				let msysRelativePath = [ "mingw32\\bin", "usr\\local\\bin", "usr\\bin" ];
-
-				msysRelativePath.forEach(e => {
-					env.Path += ";" + Path.normalize(Path.join(msysRoot, e));
-				});
-				// console.info(env.Path);
-
-				this.process = ChildProcess.spawn(this.application, this.args, { env: env });
+				this.process = ChildProcess.spawn(this.application, this.args, this.options);
 				this.process.stdout.on('data', this.onStdout.bind(this));
 				this.process.stderr.on('data', this.onStderr.bind(this));
 
@@ -90,4 +108,17 @@ export class GDBServer extends EventEmitter {
             this.errBuffer = this.errBuffer.substring(end + 1);
         }
 	}
+
+	protected serverEnv(root: string, relPaths: string[]): Object
+	{
+		let env = process.env;
+
+		relPaths.forEach(path =>
+		{
+			env.Path += ";" + Path.normalize(Path.join(root, path));
+		});
+
+		return env;
+	}
 }
+

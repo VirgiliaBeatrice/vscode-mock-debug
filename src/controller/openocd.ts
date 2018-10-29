@@ -1,11 +1,12 @@
-import { GDBServerController, ConfigurationArgs } from "./gdb";
+import { GDBServerController, LaunchConfigurationArgs } from "./gdb";
 import { EventEmitter } from "events";
+import * as Path from "path";
 
-export class OpenOCDServerController extends EventEmitter implements GDBServerController {
+export class OpenOCDDebugController extends EventEmitter implements GDBServerController {
 	// public port = 4444;
 	public name = 'OpenOCD-ESP32';
 
-	private args: ConfigurationArgs;
+	private args: LaunchConfigurationArgs;
 
 	constructor(public port: number) {
 		super();
@@ -15,7 +16,7 @@ export class OpenOCDServerController extends EventEmitter implements GDBServerCo
 		this.port = port;
 	}
 
-	public setArgs(args: ConfigurationArgs): void {
+	public setArgs(args: LaunchConfigurationArgs): void {
 		this.args = args;
 	}
 
@@ -40,6 +41,10 @@ export class OpenOCDServerController extends EventEmitter implements GDBServerCo
 		return [
 			'interpreter-exec console "monitor reset halt"'
 		];
+	}
+
+	public serverApplication(): string {
+		return Path.join(this.args.serverCwd, this.args.serverExecutable);
 	}
 
 	public serverExecutable(): string {
