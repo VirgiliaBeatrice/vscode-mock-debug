@@ -25,7 +25,7 @@ export class BackendService extends EventEmitter implements IBackendService  {
 	public initResolve: (result: boolean) => void;
 	public initReject: (error: any) => void;
 
-	constructor(public name: string, public application: string, private args?: string[], private options?: ChildProcess.SpawnOptions, private addtionalEnv?: any) {
+	constructor(public name: string, public application: string, private args?: string[], private addtionalEnv?: any, private options?: ChildProcess.SpawnOptions) {
 		super();
 
 		if (this.options === undefined) {
@@ -34,6 +34,7 @@ export class BackendService extends EventEmitter implements IBackendService  {
 
 		if (this.addtionalEnv) {
 			this.options = {
+				cwd: this.addtionalEnv.root,
 				env: this.serverEnv(this.addtionalEnv.root, this.addtionalEnv.relPaths)
 			};
 

@@ -44,7 +44,7 @@ export class OpenOCDDebugController extends EventEmitter implements GDBServerCon
 	}
 
 	public serverApplication(): string {
-		return Path.join(this.args.serverCwd, this.args.serverExecutable);
+		return Path.join(this.args.serverDir, this.args.serverExecutable);
 	}
 
 	public serverExecutable(): string {
@@ -52,12 +52,49 @@ export class OpenOCDDebugController extends EventEmitter implements GDBServerCon
 	}
 
 	public serverArgs(): string[] {
-		return this.args.serverArgs;
+		let args: string[] = [];
+
+		this.args.openocdSearchDir.forEach(
+			(dir) => {
+				args.push(...["-s", Path.join(this.args.msysDir, dir)]);
+			}
+		);
+
+		this.args.openocdConfigFiles.forEach(
+			(file) => {
+				args.push(...["-f", file]);
+			}
+		);
+
+		return args;
 	}
 
-	public serverLaunchStarted(): void {};
-	public serverLaunchCompleted(): void {};
-	public debuggerLaunchStarted(): void {};
-	public debuggerLaunchCompleted(): void {};
+	public debuggerApplication(): string {
+		return Path.join(this.args.msysDir, this.args.debuggerDir, this.args.debuggerExecutable);
+	}
+
+	public debuggerArgs(): string[] {
+		let args: string[] = [];
+
+		return [];
+	}
+
+	public additionalEnv(): object{
+		return {
+			root: this.args.msysDir,
+			relPaths: [
+				"mingw32\\bin",
+				"usr\\local\\bin",
+				"usr\\bin"
+			],
+
+		};
+
+	}
+
+	public serverLaunchStarted(): void {}
+	public serverLaunchCompleted(): void {}
+	public debuggerLaunchStarted(): void {}
+	public debuggerLaunchCompleted(): void {}
 
 }

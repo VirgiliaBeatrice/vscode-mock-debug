@@ -24,7 +24,7 @@ class ESPDebugExtention {
 				return vscode.window.showInputBox({
 					placeHolder: "Please enter the name of a markdown file in the workspace folder",
 					value: "readme.md"
-				})
+				});
 			})
 		);
 

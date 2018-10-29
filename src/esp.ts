@@ -18,7 +18,7 @@ export class AdapterOutputEvent extends Event {
 	public body: {
 		type: string,
 		content: string
-	}
+	};
 	public event: string;
 
 	constructor(content: string, type: string) {
@@ -63,7 +63,6 @@ export class ESPDebugSession extends DebugSession {
 
 	protected launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchConfigurationArgs): void {
 		this.args = args;
-		this.controller = new OpenOCDDebugController(this.port);
 		// this.controller.on('event', this.controllerEvent.bind(this));
 
 		const serverExecutable = "C:\\msys32\\mingw32\\bin\\openocd.exe";
@@ -84,10 +83,11 @@ export class ESPDebugSession extends DebugSession {
 		this.server = new BackendService(
 			"Subprocess for Server Instance",
 			this.controller.serverApplication(),
-			this.controller.serverArgs()
+			this.controller.serverArgs(),
+			this.controller.additionalEnv()
 		);
 		// this.server = new GDBServer(this.controller.serverApplication(), this.controller.serverArgs());
-		this.server.on('output', (output) => {this.sendEvent(new AdapterOutputEvent(output, 'out'))});
+		this.server.on('output', (output) => {this.sendEvent(new AdapterOutputEvent(output, 'out'));});
 		this.server.on('quit', this.onQuit.bind(this));
 		this.server.on('launcherror', this.onLaunchError.bind(this));
 		this.server.on('exit', (code, signal) => {
@@ -96,6 +96,17 @@ export class ESPDebugSession extends DebugSession {
 
 		this.server.init().then(() => {
 			console.info("OpenOCD server started.");
+		});
+
+		// TODO: Run debugger
+		this.debugger = new BackendService(
+			"Subprocess for Debugger Instance",
+			this.controller.debuggerApplication(),
+			this.controller.debuggerArgs()
+		);
+		this.debugger.on('output', (output) => {this.sendEvent(new AdapterOutputEvent(output, 'out'));});
+		this.debugger.init().then(() => {
+			console.info("GDB debugger started.");
 		});
 
 		// this.controller.serverLaunchStarted();
