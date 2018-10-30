@@ -95,9 +95,14 @@ export class ESPDebugSession extends DebugSession {
 			console.log(`Server process exited. CODE: ${code} SIGNAL:  ${signal}`);
 		});
 
-		this.server.init().then(() => {
-			console.info("OpenOCD server started.");
-		});
+		this.server.init().then(
+			() => {
+				console.info("OpenOCD server started.");
+			},
+			() => {
+				this.server.emit('lauhcherror', 103, response);
+			}
+		);
 
 		// TODO: Run debugger
 		this.debugger = new BackendService(
@@ -134,6 +139,7 @@ export class ESPDebugSession extends DebugSession {
 
 	protected terminateRequest(response: DebugProtocol.TerminateResponse, args: DebugProtocol.TerminateArguments): void {
 		this.server.exit();
+		this.debugger.exit();
 		this.sendEvent(new TerminatedEvent(false));
 		this.sendResponse(response);
 	}
