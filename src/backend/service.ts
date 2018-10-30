@@ -88,7 +88,7 @@ export class BackendService extends EventEmitter implements IBackendService  {
 
 		const end = this.outBuffer.lastIndexOf('\n');
 		if (end !== -1) {
-			this.emit('output', this.outBuffer.substring(0, end));
+			this.emit('output', this.outBuffer.substring(0, end), this.name);
 			this.outBuffer = this.outBuffer.substring(end + 1);
 		}
 	}
@@ -105,7 +105,7 @@ export class BackendService extends EventEmitter implements IBackendService  {
 		// Output a newline
         const end = this.errBuffer.lastIndexOf('\n');
         if (end !== -1) {
-            this.emit('output', this.errBuffer.substring(0, end));
+            this.emit('output', this.errBuffer.substring(0, end), this.name);
             this.errBuffer = this.errBuffer.substring(end + 1);
         }
 	}

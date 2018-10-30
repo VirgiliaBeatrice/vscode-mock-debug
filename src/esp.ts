@@ -17,12 +17,13 @@ export interface OpenOCDArgments {
 export class AdapterOutputEvent extends Event {
 	public body: {
 		type: string,
-		content: string
+		content: string,
+		source: string
 	};
 	public event: string;
 
-	constructor(content: string, type: string) {
-		super('adapter-output', { content: content, type: type });
+	constructor(content: string, type: string, source: string) {
+		super('adapter-output', { content: content, type: type, source: source });
 	}
 }
 
@@ -87,7 +88,7 @@ export class ESPDebugSession extends DebugSession {
 			this.controller.additionalEnv()
 		);
 		// this.server = new GDBServer(this.controller.serverApplication(), this.controller.serverArgs());
-		this.server.on('output', (output) => {this.sendEvent(new AdapterOutputEvent(output, 'out'));});
+		this.server.on('output', (output, source) => {this.sendEvent(new AdapterOutputEvent(output, 'out', source));});
 		this.server.on('quit', this.onQuit.bind(this));
 		this.server.on('launcherror', this.onLaunchError.bind(this));
 		this.server.on('exit', (code, signal) => {
@@ -104,7 +105,7 @@ export class ESPDebugSession extends DebugSession {
 			this.controller.debuggerApplication(),
 			this.controller.debuggerArgs()
 		);
-		this.debugger.on('output', (output) => {this.sendEvent(new AdapterOutputEvent(output, 'out'));});
+		this.debugger.on('output', (output, source) => {this.sendEvent(new AdapterOutputEvent(output, 'out', source));});
 		this.debugger.init().then(() => {
 			console.info("GDB debugger started.");
 		});

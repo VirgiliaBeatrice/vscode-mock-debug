@@ -16,7 +16,8 @@ import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken 
  */
 
 class ESPDebugExtention {
-	private adapterOutputChannel: vscode.OutputChannel = undefined;
+	private adapterOutputChannelServer: vscode.OutputChannel = undefined;
+	private adapterOutputChannelDebugger: vscode.OutputChannel = undefined;
 
 	constructor(private context: vscode.ExtensionContext) {
 		context.subscriptions.push(
@@ -39,17 +40,27 @@ class ESPDebugExtention {
 
 	private onReceivedCustomEvent(e: vscode.DebugSessionCustomEvent) {
 		if (e.event === 'adapter-output') {
-			if (!this.adapterOutputChannel) {
-				this.adapterOutputChannel = vscode.window.createOutputChannel('Adapter Output');
-			}
-
-			let output = e.body.content;
+			let output: string = e.body.content;
 
 			if (!output.endsWith('\n')) {
 				output += '\n';
 			}
 
-			this.adapterOutputChannel.append(output);
+			if (e.body.source === "Subprocess for Server Instance"){
+				if (!this.adapterOutputChannelServer)
+				{
+					this.adapterOutputChannelServer = vscode.window.createOutputChannel('Adapter Output - [Server]');
+				}
+				this.adapterOutputChannelServer.append(output);
+			}
+			else if (e.body.source === "Subprocess for Debugger Instance")
+			{
+				if (!this.adapterOutputChannelDebugger)
+				{
+					this.adapterOutputChannelDebugger = vscode.window.createOutputChannel("Adapter Output - [Debugger]");
+				}
+				this.adapterOutputChannelDebugger.append(output);
+			}
 		}
 	}
 }
