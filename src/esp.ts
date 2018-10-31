@@ -6,6 +6,7 @@ import { BackendService } from "./backend/service";
 import { GDBServerController, LaunchConfigurationArgs } from "./controller/gdb";
 import { OpenOCDDebugController } from "./controller/openocd";
 import { GDBDebugger } from "./backend/debugger";
+import { GDBServer } from "./backend/server";
 
 export interface OpenOCDArgments {
 	cwd: string;
@@ -81,12 +82,19 @@ export class ESPDebugSession extends DebugSession {
 		this.controller.setArgs(this.args);
 
 		// TODO: Run server.
-		this.server = new BackendService(
-			"Subprocess for Server Instance",
+		this.server = new GDBServer(
 			this.controller.serverApplication(),
 			this.controller.serverArgs(),
-			this.controller.additionalEnv()
+			"C:\\msys32",
+			"."
 		);
+
+		// this.server = new BackendService(
+		// 	"Subprocess for Server Instance",
+		// 	this.controller.serverApplication(),
+		// 	this.controller.serverArgs(),
+		// 	this.controller.additionalEnv()
+		// );
 		// this.server = new GDBServer(this.controller.serverApplication(), this.controller.serverArgs());
 		this.server.on('output', (output, source) => {this.sendEvent(new AdapterOutputEvent(output, 'out', source));});
 		this.server.on('quit', this.onQuit.bind(this));
@@ -105,14 +113,19 @@ export class ESPDebugSession extends DebugSession {
 		);
 
 		// TODO: Run debugger
-		this.debugger = new BackendService(
-			"Subprocess for Debugger Instance",
+		// this.debugger = new BackendService(
+		// 	"Subprocess for Debugger Instance",
+		// 	this.controller.debuggerApplication(),
+		// 	this.controller.debuggerArgs()
+		// );
+		this.debugger = new GDBDebugger(
 			this.controller.debuggerApplication(),
-			this.controller.debuggerArgs()
 		);
 		this.debugger.on('output', (output, source) => {this.sendEvent(new AdapterOutputEvent(output, 'out', source));});
 		this.debugger.init().then(() => {
 			console.info("GDB debugger started.");
+			this.debugger.sendCommand(["target remote localhost:3333"]);
+			this.debugger.sendCommand(["monitor reset halt"]);
 		});
 
 		// this.controller.serverLaunchStarted();

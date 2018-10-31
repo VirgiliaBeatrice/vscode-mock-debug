@@ -2,10 +2,22 @@ import * as ChildProcess from 'child_process';
 import { EventEmitter } from 'events';
 import * as Path from 'path';
 
+export enum ServiceType{
+	Server,
+	Debugger
+}
+
+export interface AddtionalOptions {
+	cwd?: string;
+	env?: Object;
+}
+
 export interface IBackendService extends EventEmitter {
 	name: string;
+	type: ServiceType;
 	application: string;
 	process: ChildProcess.ChildProcess;
+	inBuffer: string;
 	outBuffer: string;
 	errBuffer: string;
 
@@ -22,23 +34,20 @@ export class BackendService extends EventEmitter implements IBackendService  {
 	public process: ChildProcess.ChildProcess;
 	public outBuffer: string = '';
 	public errBuffer: string  = '';
+	public inBuffer: string = '';
 	public initResolve: (result: boolean) => void;
 	public initReject: (error: any) => void;
 
-	constructor(public name: string, public application: string, private args?: string[], private addtionalEnv?: any, private options?: ChildProcess.SpawnOptions) {
+	constructor(public name: string, public type: ServiceType, public application: string, private args?: string[], private options?: AddtionalOptions) {
 		super();
-
-		if (this.options === undefined) {
+		if (options === undefined)
+		{
 			this.options = { };
 		}
+	}
 
-		if (this.addtionalEnv) {
-			this.options = {
-				cwd: this.addtionalEnv.root,
-				env: this.serverEnv(this.addtionalEnv.root, this.addtionalEnv.relPaths)
-			};
-
-		}
+	public setOptions(options: AddtionalOptions): void {
+		this.options = options;
 	}
 
 	public init(): Thenable<any> {
@@ -61,6 +70,10 @@ export class BackendService extends EventEmitter implements IBackendService  {
 		if (this.process) {
 			this.process.kill();
 		}
+	}
+
+	public sendCommand(cmd: string[]): void {
+		this.process.stdin.write(cmd + "\n");
 	}
 
 	private onExit(code, signal) {
@@ -110,11 +123,11 @@ export class BackendService extends EventEmitter implements IBackendService  {
         }
 	}
 
-	protected serverEnv(root: string, relPaths: string[]): Object
+	static parseEnv(root: string, relPath: string[]): Object
 	{
 		let env = process.env;
 
-		relPaths.forEach(path =>
+		relPath.forEach(path =>
 		{
 			env.Path += ";" + Path.normalize(Path.join(root, path));
 		});

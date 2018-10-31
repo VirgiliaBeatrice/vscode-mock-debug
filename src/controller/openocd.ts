@@ -74,7 +74,7 @@ export class OpenOCDDebugController extends EventEmitter implements GDBServerCon
 	}
 
 	public debuggerArgs(): string[] {
-		let args: string[] = [];
+		// let args: string[] = [];
 
 		return [];
 	}

@@ -6,7 +6,7 @@
 
 import * as vscode from 'vscode';
 import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken } from 'vscode';
-// import { ESPDebugSession } from "./esp";
+import { AdapterOutputEvent } from "./esp";
 // import * as Net from 'net';
 
 /*
@@ -38,22 +38,22 @@ class ESPDebugExtention {
 		);
 	}
 
-	private onReceivedCustomEvent(e: vscode.DebugSessionCustomEvent) {
-		if (e.event === 'adapter-output') {
+	private onReceivedCustomEvent(e: any) {
+		if ((e as AdapterOutputEvent).event === 'adapter-output') {
 			let output: string = e.body.content;
 
 			if (!output.endsWith('\n')) {
 				output += '\n';
 			}
 
-			if (e.body.source === "Subprocess for Server Instance"){
+			if (e.body.source === "Subprocess for GDB Server Instance"){
 				if (!this.adapterOutputChannelServer)
 				{
 					this.adapterOutputChannelServer = vscode.window.createOutputChannel('Adapter Output - [Server]');
 				}
-				this.adapterOutputChannelServer.append(output);
+				this.adapterOutputChannelServer.append (output);
 			}
-			else if (e.body.source === "Subprocess for Debugger Instance")
+			else if (e.body.source === "Subprocess for GDB Debugger Instance")
 			{
 				if (!this.adapterOutputChannelDebugger)
 				{
