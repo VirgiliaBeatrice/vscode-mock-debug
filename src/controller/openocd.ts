@@ -24,6 +24,34 @@ export class OpenOCDDebugController extends EventEmitter implements GDBServerCon
 
 	}
 
+	public connectCmd(port?: number): string[] {
+		return [ `target-select remote localhost:${port}` ];
+	}
+
+	public loadSymbolCmd(symbolFilePath: string): string[] {
+		return [
+			`file-exec-and-symbols ${symbolFilePath}`
+		];
+	}
+
+	public resetCmd(): string[] {
+		return [
+			"interpreter-exec console \"monitor reset halt\""
+		];
+	}
+
+	public setBreakpointCmd(symbol: string): string[] {
+		return [
+			`break-insert -t -h ${symbol}`
+		];
+	}
+
+	public continueCmd(): string[] {
+		return [
+			"exec-continue"
+		];
+	}
+
 	public initCmds(): string[] {
 		return [
 			`target-select extended-remote localhost:${this.port.toString()}`
