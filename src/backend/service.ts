@@ -1,6 +1,7 @@
 import * as ChildProcess from 'child_process';
 import { EventEmitter } from 'events';
 import * as Path from 'path';
+import { MINode, parseMI } from './mi_parse';
 
 export enum ServiceType{
 	Server,
@@ -23,6 +24,8 @@ export interface IBackendService extends EventEmitter {
 
 	initResolve: (result: boolean) => void;
 	initReject: (error: any) => void;
+
+	postProcess: (content: string) => MINode | void;
 
 	init: () => Thenable<any>;
 	exit: () => void;
@@ -50,6 +53,11 @@ export class BackendService extends EventEmitter implements IBackendService  {
 		this.options = options;
 	}
 
+	public postProcess(content: string): void {
+
+	}
+
+
 	public init(): Thenable<any> {
 		return new Promise((resolve, reject) => {
 			if (this.application !== null) {
@@ -72,9 +80,9 @@ export class BackendService extends EventEmitter implements IBackendService  {
 		}
 	}
 
-	public sendCommand(cmd: string[]): void {
-		this.process.stdin.write(cmd + "\n");
-	}
+	// public sendCommand(cmd: string[]): void {
+	// 	this.process.stdin.write(cmd + "\n");
+	// }
 
 	private onExit(code, signal) {
 		this.emit('exit', code, signal);
@@ -102,9 +110,14 @@ export class BackendService extends EventEmitter implements IBackendService  {
 		const end = this.outBuffer.lastIndexOf('\n');
 		if (end !== -1) {
 			this.emit('output', this.outBuffer.substring(0, end), this.name);
+			this.postProcess(this.outBuffer.substring(0, end));
+
 			this.outBuffer = this.outBuffer.substring(end + 1);
 		}
+
 	}
+
+
 
 	private onStderr(data) {
 		this.errBuffer += data;

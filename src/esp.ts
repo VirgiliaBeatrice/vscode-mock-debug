@@ -30,7 +30,7 @@ export class AdapterOutputEvent extends Event {
 
 export class ESPDebugSession extends DebugSession {
 	private server: BackendService;
-	private debugger: BackendService;
+	private debugger: GDBDebugger;
 	private args: LaunchConfigurationArgs;
 	private port: number;
 
@@ -124,8 +124,8 @@ export class ESPDebugSession extends DebugSession {
 		this.debugger.on('output', (output, source) => {this.sendEvent(new AdapterOutputEvent(output, 'out', source));});
 		this.debugger.init().then(() => {
 			console.info("GDB debugger started.");
-			this.debugger.sendCommand(["target remote localhost:3333"]);
-			this.debugger.sendCommand(["monitor reset halt"]);
+			this.debugger.excuteCommand("interpreter-exec console \"target remote localhost:3333\"");
+			this.debugger.excuteCommand("interpreter-exec console \"monitor reset halt\"");
 		});
 
 		// this.controller.serverLaunchStarted();

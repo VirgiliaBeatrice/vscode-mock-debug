@@ -25,7 +25,9 @@ export class OpenOCDDebugController extends EventEmitter implements GDBServerCon
 	}
 
 	public connectCmd(port?: number): string[] {
-		return [ `target-select remote localhost:${port}` ];
+		return [
+			`target-select remote localhost:${port}`
+		];
 	}
 
 	public loadSymbolCmd(symbolFilePath: string): string[] {

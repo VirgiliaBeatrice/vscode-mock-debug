@@ -13,8 +13,8 @@
 		"**/node_modules": true,
 		"out": true
 	},
-	"typescript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBrackets": true,
-	"javascript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBrackets": true,
+	"typescript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBrackets": false,
+	"javascript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBrackets": false,
 	"javascript.format.placeOpenBraceOnNewLineForFunctions": true,
 	"typescript.format.placeOpenBraceOnNewLineForFunctions": true,
 	"typescript.format.placeOpenBraceOnNewLineForControlBlocks": true,
