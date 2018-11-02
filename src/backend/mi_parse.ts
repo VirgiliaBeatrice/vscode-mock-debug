@@ -447,10 +447,10 @@ export function parseMI(output: string): Array<any> {
 
 
     const tokenRegExp = new RegExp(/\d*/);
-    const constRegExp = new RegExp(/"."/);
+    const constRegExp = new RegExp(/".+?"/);
     const tupleRegExp = new RegExp(/\{.*\}/);
     const listRegExp = new RegExp(/\[.*\]/);
-    const asyncClassRegExp = new RegExp(/(stopped)/);
+    const asyncClassRegExp = new RegExp(/[a-zA-Z0-9_\-]*/);
     const resultClassRegExp = new RegExp(/(done)|(running)|(connected)|(error)|(exit)/);
     const variableRegExp = new RegExp(/([a-zA-Z_\-][a-zA-Z0-9_\-]*)/);
     const valueRegExp: RegExp = RegExpHelper.or(
@@ -475,8 +475,8 @@ export function parseMI(output: string): Array<any> {
 
     const asyncOutputRegExp = RegExpHelper.add(
         false, false,
-        new RegExpPair(asyncClassRegExp),
-        new RegExpPair(gResultRegExp)
+        new RegExpPair(asyncClassRegExp, "+"),
+        new RegExpPair(gResultRegExp, "*")
     );
 
 
@@ -498,12 +498,12 @@ export function parseMI(output: string): Array<any> {
     const resultRecordRegExp = RegExpHelper.add(
         false, false,
         new RegExpPair(tokenRegExp, "?"),
-        new RegExpPair("^"),
+        new RegExpPair("\\^"),
         new RegExpPair(resultClassRegExp),
         new RegExpPair(gResultRegExp, "*")
     );
 
-    const gdbOutputRegExp = new RegExp(/(gdb)/);
+    const gdbOutputRegExp = new RegExp(/\(gdb\)/);
 
     let parseConst = (value: string) => {
         let match = RegExpHelper.start(constRegExp).exec(value);
@@ -512,9 +512,7 @@ export function parseMI(output: string): Array<any> {
             return undefined;
         }
         else {
-            return {
-                value: match[0]
-            };
+            return match[0];
         }
     };
 
@@ -526,8 +524,8 @@ export function parseMI(output: string): Array<any> {
         }
         else {
             return {
-                value: parseResult(value.substr(match[0].length).slice(1, -1)),
-                result: parseResult(value.substr(match[0].length).slice(1, -1))
+                value: parseResult("," + value.slice(1, -1)),
+                result: parseResult("," + value.slice(1, -1))
             };
         }
     };
@@ -539,7 +537,7 @@ export function parseMI(output: string): Array<any> {
             return undefined;
         }
         else {
-            let result = parseResult(value.substr(match[0].length).slice(1, -1));
+            let result = parseResult("," + value.slice(1, -1));
 
             return {
                 result: result
@@ -573,12 +571,27 @@ export function parseMI(output: string): Array<any> {
         }
         else {
             let variable = match[3];
-            let value = parseValue(match[5]);
+            let value = parseValue(match[6]);
+            let remaining: Array<any> | undefined = parseResult(result.substr(match[0].length));
 
-            return {
-                variable: variable,
-                value: value
-            };
+            if (remaining)
+            {
+                return [
+                    {
+                        variable: variable,
+                        value: value
+                    },
+                    ...remaining
+                ];
+            }
+            else{
+                return [
+                    {
+                        variable: variable,
+                        value: value
+                    }
+                ];
+            }
         }
 
     };
@@ -610,16 +623,16 @@ export function parseMI(output: string): Array<any> {
             return undefined;
         }
         else {
-            let token = match[1];
+            let token = parseInt(match[1]);
             let type = asyncRecordType[match[2]];
-            let asyncOutput = parseAsyncOutput(
-                record.substr(match[1].length + match[2].length)
-            );
+            let asyncOutput = parseAsyncOutput(match[0].slice(1));
+            let result = parseResult(record.substr(match[2].length + match[4].length));
 
             return {
                 token: token,
                 type: type,
-                asyncOutput: asyncOutput
+                asyncOutput: asyncOutput,
+                result: result
             };
         }
     };
@@ -633,7 +646,7 @@ export function parseMI(output: string): Array<any> {
         else {
             return {
                 type: streamRecordType[match[1]],
-                streamOutput: parseConst(match[2])
+                streamOutput: parseConst(match[3])
             };
         }
     };
@@ -661,14 +674,14 @@ export function parseMI(output: string): Array<any> {
         }
         else {
             return {
-                token: match[1],
+                token: parseInt(match[1]),
                 resultClass: match[3],
                 result: parseResult(record.substr(match[1].length + match[2].length + match[3].length))
             };
         }
     };
 
-    let parseGdbOutput = (record) => {
+    let parseGdbOutput = (record: string) => {
         let match = RegExpHelper.start(gdbOutputRegExp).exec(record);
 
         if (!match) {
@@ -676,7 +689,7 @@ export function parseMI(output: string): Array<any> {
         }
         else {
             return {
-                GdbOutput: match[1]
+                GdbOutput: match[0]
             };
         }
     };
@@ -705,7 +718,9 @@ export function parseMI(output: string): Array<any> {
     let lines: string[] = (output as string).split(/\r\n?/);
     lines.forEach(
         (record) => {
-            miObject.push(parseRecord(record));
+            if (record !== ""){
+                miObject.push(parseRecord(record));
+            }
         }
     );
 
