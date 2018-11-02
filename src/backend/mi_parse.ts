@@ -1,51 +1,133 @@
+import { isRegExp } from "util";
+
 export interface MIInfo {
     token: number;
     outOfBandRecord: Array<{ isStream: boolean, type: string, asyncClass: string, output: Array<[string, any]>, content: string }>;
     resultRecords: { resultClass: string, results: Array<[string, any]> };
 }
 
-interface IRegExpHelper
-{
-    or: any;
-    add: any;
+interface IRegExpPair {
+    regExp: RegExp | string;
+    quantifier: string;
 }
 
-let RegExpHelper: IRegExpHelper = {
-    or: undefined,
-    add: undefined
-};
+class RegExpPair implements IRegExpPair {
+    public quantifier = undefined;
 
-RegExpHelper.or = (beggining: boolean, end: boolean, ...regExps: RegExp[]): RegExp =>
-{
-    return new RegExp(
-        [
-            beggining ? "^" : "",
-            regExps.map(
-                (regExp) =>
-                {
-                    return `(${regExp.source})`;
-                }
-            ).join("|"),
-            end ? "$" : ""
-        ].join("")
-    );
-};
+    constructor(public regExp: RegExp | string, quantifier?: string) {
+        if (!quantifier)
+        {
+            this.quantifier = "";
+        }
+        else {
+            this.quantifier = quantifier;
+        }
+     }
+}
 
-RegExpHelper.add = (beggining: boolean, end: boolean, ...regExps: RegExp[]): RegExp =>
+interface IRegExpHelper
 {
-    return new RegExp(
-        [
-            beggining ? "^" : "",
-            regExps.map(
-                (regExp) =>
-                {
-                    return `${regExp.source}`;
-                }
-            ).join(""),
-            end ? "$" : ""
-        ].join("")
-    );
-};
+    or: (beggining: boolean, end: boolean, ...pairs: Array<IRegExpPair> | Array<IRegExpPair>) => RegExp;
+    add: (beggining: boolean, end: boolean, ...pairs: Array<IRegExpPair> | Array<IRegExpPair>) => RegExp;
+}
+
+// let RegExpHelper: IRegExpHelper = {
+//     or: undefined,
+//     add: undefined
+// };
+
+
+class RegExpHelper {
+
+    // static isRegExp(target: RegExp | string): target is RegExp {
+    //     return (<RegExp>target).source !== undefined;
+    // }
+
+
+
+    public setQuantifier(quantifier: "+" | "*" | "?"): void {
+
+    }
+
+    static or(beggining: boolean, end: boolean, ...pairs: Array<IRegExpPair> | Array<IRegExpPair>): RegExp
+    {
+        return new RegExp(
+            [
+                beggining ? "^" : "",
+                pairs.map(
+                    (pair) =>
+                    {
+                        if (isRegExp(pair.regExp))
+                        {
+                            return `(${pair.regExp.source})${pair.quantifier}`;
+                        }
+                        else
+                        {
+                            return `(${pair.regExp})${pair.quantifier}`;
+                        }
+
+                    }
+                ).join("|"),
+                end ? "$" : ""
+            ].join("")
+        );
+    }
+
+    static add(beggining: boolean, end: boolean, ...pairs: Array<IRegExpPair> | Array<IRegExpPair>): RegExp
+    {
+        return new RegExp(
+            [
+                beggining ? "^" : "",
+                pairs.map(
+                    (pair) =>
+                    {
+                        if (isRegExp(pair.regExp))
+                        {
+                            return `(${pair.regExp.source})${pair.quantifier}`;
+                        }
+                        else
+                        {
+                            return `(${pair.regExp})${pair.quantifier}`;
+                        }
+                    }
+                ).join(""),
+                end ? "$" : ""
+            ].join("")
+        );
+    }
+}
+
+// RegExpHelper.or = (beggining: boolean, end: boolean, ...regExps: RegExp[]): RegExp =>
+// {
+//     return new RegExp(
+//         [
+//             beggining ? "^" : "",
+//             regExps.map(
+//                 (regExp) =>
+//                 {
+//                     return `(${regExp.source})`;
+//                 }
+//             ).join("|"),
+//             end ? "$" : ""
+//         ].join("")
+//     );
+// };
+
+// RegExpHelper.add = (beggining: boolean, end: boolean, ...regExps: RegExp[]): RegExp =>
+// {
+//     return new RegExp(
+//         [
+//             beggining ? "^" : "",
+//             regExps.map(
+//                 (regExp) =>
+//                 {
+//                     return `${regExp.source}`;
+//                 }
+//             ).join(""),
+//             end ? "$" : ""
+//         ].join("")
+//     );
+// };
 
 const octalMatch = /^[0-7]{3}/;
 function parseString(str: string): string {
@@ -363,9 +445,40 @@ export function parseMI(output: string): MINode {
     const listRegExp = new RegExp(/\[.*\]/);
 
     const variableRegExp = new RegExp(/([a-zA-Z_\-][a-zA-Z0-9_\-]*)/);
-    const valueRegExp: RegExp = RegExpHelper.or(constRegExp, tupleRegExp, listRegExp);
+    const valueRegExp: RegExp = RegExpHelper.or(
+        false, false,
+        new RegExpPair(constRegExp),
+        new RegExpPair(tupleRegExp),
+        new RegExpPair(listRegExp)
+    );
 
-    const resultRegExp: RegExp = RegExpHelper.add(true, variableRegExp, new RegExp(/=/), valueRegExp);
+    const resultRegExp: RegExp = RegExpHelper.add(
+        false, false,
+        new RegExpPair(variableRegExp),
+        new RegExpPair("="),
+        new RegExpPair(valueRegExp)
+    );
+
+    const asyncClassRegExp = new RegExp(/(stopped)/);
+    const resultClassRegExp = new RegExp(/(done)|(running)|(connected)|(error)|(exit)/);
+
+    const asyncOutputRegExp = new RegExp(/(\d)*([\*\+=])/);
+    const streamOutputRegExp = new RegExp(/([~@&])/);
+
+    const asyncRecordRegExp = RegExpHelper.add(
+        false, false,
+        { regExp: asyncOutputRegExp, quantifier: "" },
+        { regExp: asyncClassRegExp, quantifier: "" },
+        {
+            regExp: RegExpHelper.add(
+                false, false,
+                { regExp: ",", quantifier: "" },
+                { regExp: resultRegExp, quantifier: ""}
+            ),
+            quantifier: "*"
+        }
+    );
+
 
     parseResult = (result: string) => {
         let variableMatch = variableRegExp.exec(result);
@@ -389,6 +502,25 @@ export function parseMI(output: string): MINode {
         }
     };
 
+    let parseOutput = (output: string) => {
+
+    };
+
+    let parseAsyncRecord = (record: string) => {
+
+    };
+
+    let parseOutOfBandRecord = (record: string) => {
+
+    };
+
+    let parseRecord = (record: string) => {
+        let match = outOfBandRecordRegex.exec(record);
+
+        if (match) {
+
+        }
+    };
 
 
     let match;
