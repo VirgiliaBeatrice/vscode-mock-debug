@@ -42,12 +42,12 @@ export class GDBDebugger extends BackendService implements IBackendService
 
 		return new Promise(
 			(resolve, reject) => {
-				let callback = (result: string) =>
+				let callback = (record: string) =>
 				{
-					if (result)
+					if (record)
 					{
-						resolve(result);
-						console.log(result);
+						resolve(record);
+						// console.log(result);
 					}
 					else {
 						reject();
@@ -60,22 +60,22 @@ export class GDBDebugger extends BackendService implements IBackendService
 	}
 
 	public async excuteCommand(cmd: string): Promise<any> {
-		let result = await this.sendCommand(cmd);
+		let record = await this.sendCommand(cmd);
 
-		this.pendingTasks.delete(result.token);
-		console.log(`Command(${cmd}) finished.`);
+		this.pendingTasks.delete(record.token);
+		console.log(`Command No.${record.token} "${cmd}" finished.`);
 	}
 
 	public postProcess(content: string): Array<any>
 	{
-		console.log(content);
+		// console.log(content);
 		let records = parseMI(content);
-		console.log(records);
+		// console.log(records);
 
 		records.forEach(
 			(record) => {
 				if (record.token) {
-					this.pendingTasks.get(record.token)(content);
+					this.pendingTasks.get(record.token)(record);
 				}
 			}
 		);

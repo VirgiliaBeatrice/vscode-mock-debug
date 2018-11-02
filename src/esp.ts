@@ -119,13 +119,16 @@ export class ESPDebugSession extends DebugSession {
 		// 	this.controller.debuggerArgs()
 		// );
 		this.debugger = new GDBDebugger(
-			this.controller.debuggerApplication(),
+			this.controller.debuggerApplication()
 		);
 		this.debugger.on('output', (output, source) => {this.sendEvent(new AdapterOutputEvent(output, 'out', source));});
 		this.debugger.init().then(() => {
 			console.info("GDB debugger started.");
 			this.debugger.excuteCommand("interpreter-exec console \"target remote localhost:3333\"");
+			this.debugger.excuteCommand("file-exec-and-symbols .\\build\\hello-world.elf");
 			this.debugger.excuteCommand("interpreter-exec console \"monitor reset halt\"");
+			this.debugger.excuteCommand("break-insert -t -h app_main");
+			this.debugger.excuteCommand("exec-continue");
 		});
 
 		// this.controller.serverLaunchStarted();

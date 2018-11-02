@@ -291,13 +291,13 @@ export class MINode implements MIInfo {
     }
 }
 
-const tokenRegex = /^\d+/;
-const outOfBandRecordRegex = /^(?:(\d*|undefined)([\*\+\=])|([\~\@\&]))/;
-const resultRecordRegex = /^(\d*)\^(done|running|connected|error|exit)/;
-const newlineRegex = /^\r\n?/;
-const endRegex = /^\(gdb\)\r\n?/;
-const variableRegex = /^([a-zA-Z_\-][a-zA-Z0-9_\-]*)/;
-const asyncClassRegex = /^(.*?),/;
+// const tokenRegex = /^\d+/;
+// const outOfBandRecordRegex = /^(?:(\d*|undefined)([\*\+\=])|([\~\@\&]))/;
+// const resultRecordRegex = /^(\d*)\^(done|running|connected|error|exit)/;
+// const newlineRegex = /^\r\n?/;
+// const endRegex = /^\(gdb\)\r\n?/;
+// const variableRegex = /^([a-zA-Z_\-][a-zA-Z0-9_\-]*)/;
+// const asyncClassRegex = /^(.*?),/;
 
 export function parseMI(output: string): Array<any> {
     /*
@@ -316,9 +316,9 @@ export function parseMI(output: string): Array<any> {
             "(gdb)" \n
     */
 
-    let token;
-    const outOfBandRecord = [];
-    let resultRecords;
+    // let token;
+    // const outOfBandRecord = [];
+    // let resultRecords;
 
     const asyncRecordType = {
         '*': 'exec',
