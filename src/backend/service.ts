@@ -25,7 +25,7 @@ export interface IBackendService extends EventEmitter {
 	initResolve: (result: boolean) => void;
 	initReject: (error: any) => void;
 
-	postProcess: (content: string) => MINode | void;
+	postProcess: (content: string) => MINode | void | Array<any>;
 
 	init: () => Thenable<any>;
 	exit: () => void;

@@ -299,7 +299,7 @@ const endRegex = /^\(gdb\)\r\n?/;
 const variableRegex = /^([a-zA-Z_\-][a-zA-Z0-9_\-]*)/;
 const asyncClassRegex = /^(.*?),/;
 
-export function parseMI(output: string): MINode {
+export function parseMI(output: string): Array<any> {
     /*
         output ==>
             (
@@ -364,86 +364,86 @@ export function parseMI(output: string): MINode {
         return str;
     };
 
-    let parseValue;
-    let parseCommaResult;
-    let parseCommaValue;
-    let parseResult;
+    // let parseValue;
+    // let parseCommaResult;
+    // let parseCommaValue;
+    // let parseResult;
 
-    const parseTupleOrList = (value) => {
-        if (value[0] !== '{' && value[0] !== '[') {
-            return undefined;
-        }
-        const oldContent = value;
-        const canBeValueList = value[0] === '[';
-        value = value.substr(1);
-        if (value[0] === '}' || value[0] === ']') {
-            return [];
-        }
-        if (canBeValueList) {
-            let value = parseValue();
-            if (value) { // is value list
-                const values = [];
-                values.push(value);
-                const remaining = value;
-                while ((value = parseCommaValue()) !== undefined) {
-                    values.push(value);
-                }
-                value = value.substr(1); // ]
-                return values;
-            }
-        }
-        let result = parseResult();
-        if (result) {
-            const results = [];
-            results.push(result);
-            while (result = parseCommaResult()) {
-                results.push(result);
-            }
-            value = value.substr(1); // }
-            return results;
-        }
-        value = (canBeValueList ? '[' : '{') + value;
-        return undefined;
-    };
+    // const parseTupleOrList = (value) => {
+    //     if (value[0] !== '{' && value[0] !== '[') {
+    //         return undefined;
+    //     }
+    //     const oldContent = value;
+    //     const canBeValueList = value[0] === '[';
+    //     value = value.substr(1);
+    //     if (value[0] === '}' || value[0] === ']') {
+    //         return [];
+    //     }
+    //     if (canBeValueList) {
+    //         let value = parseValue();
+    //         if (value) { // is value list
+    //             const values = [];
+    //             values.push(value);
+    //             const remaining = value;
+    //             while ((value = parseCommaValue()) !== undefined) {
+    //                 values.push(value);
+    //             }
+    //             value = value.substr(1); // ]
+    //             return values;
+    //         }
+    //     }
+    //     let result = parseResult();
+    //     if (result) {
+    //         const results = [];
+    //         results.push(result);
+    //         while (result = parseCommaResult()) {
+    //             results.push(result);
+    //         }
+    //         value = value.substr(1); // }
+    //         return results;
+    //     }
+    //     value = (canBeValueList ? '[' : '{') + value;
+    //     return undefined;
+    // };
 
-    parseValue = (value) => {
-        if (value[0] === '"') {
-            return parseCString(value);
-        }
-        else if (value[0] === '{' || value[0] === '[') {
-            return parseTupleOrList(value);
-        }
-        else {
-            return undefined;
-        }
-    };
+    // parseValue = (value) => {
+    //     if (value[0] === '"') {
+    //         return parseCString(value);
+    //     }
+    //     else if (value[0] === '{' || value[0] === '[') {
+    //         return parseTupleOrList(value);
+    //     }
+    //     else {
+    //         return undefined;
+    //     }
+    // };
 
 
-    parseCommaValue = (value) => {
-        if (value[0] !== ',') {
-            return undefined;
-        }
-        value = value.substr(1);
-        return parseValue(value);
-    };
+    // parseCommaValue = (value) => {
+    //     if (value[0] !== ',') {
+    //         return undefined;
+    //     }
+    //     value = value.substr(1);
+    //     return parseValue(value);
+    // };
 
-    parseResult = (value) => {
-        const variableMatch = variableRegex.exec(value);
-        if (!variableMatch) {
-            return undefined;
-        }
-        value = value.substr(variableMatch[0].length + 1);
-        const variable = variableMatch[1];
-        return [variable, parseValue(value)];
-    };
+    // parseResult = (value) => {
+    //     const variableMatch = variableRegex.exec(value);
+    //     if (!variableMatch) {
+    //         return undefined;
+    //     }
+    //     value = value.substr(variableMatch[0].length + 1);
+    //     const variable = variableMatch[1];
+    //     return [variable, parseValue(value)];
+    // };
 
-    parseCommaResult = (value) => {
-        if (value[0] !== ',') {
-            return undefined;
-        }
-        value = value.substr(1);
-        return parseResult(value);
-    };
+    // parseCommaResult = (value) => {
+    //     if (value[0] !== ',') {
+    //         return undefined;
+    //     }
+    //     value = value.substr(1);
+    //     return parseResult(value);
+    // };
 
 
     const tokenRegExp = new RegExp(/\d*/);
@@ -547,7 +547,7 @@ export function parseMI(output: string): MINode {
         }
     };
 
-    parseValue = (value: string) => {
+    let parseValue = (value: string) => {
         let result: any = parseConst(value);
 
         if (result) {
@@ -565,7 +565,7 @@ export function parseMI(output: string): MINode {
         return result;
     };
 
-    parseResult = (result: string) => {
+    let parseResult = (result: string) => {
         let match = RegExpHelper.start(gResultRegExp).exec(result);
 
         if (!match) {
@@ -651,104 +651,120 @@ export function parseMI(output: string): MINode {
         {
             return result;
         }
-
-        // let match = RegExpHelper.start(asyncRecordRegExp).exec(record);
-
-        // if (match) {
-        //     if (match[1]) {
-        //         let token = parseInt(match[1]);
-        //     }
-
-        //     let asyncRecord = {
-        //         isStream: false,
-        //         type: asyncRecordType[match[2]],
-        //         asyncClass: parseAsyncRecord(record),
-        //         output: []
-        //     };
-
-
-        // }
     };
 
-    // let parseResultRecord = (record: string) => {
-    //     let match = RegExpHelper.start()
-    // };
+    let parseResultRecord = (record: string) => {
+        let match = RegExpHelper.start(resultRecordRegExp).exec(record);
+
+        if (!match) {
+            return undefined;
+        }
+        else {
+            return {
+                token: match[1],
+                resultClass: match[3],
+                result: parseResult(record.substr(match[1].length + match[2].length + match[3].length))
+            };
+        }
+    };
+
+    let parseGdbOutput = (record) => {
+        let match = RegExpHelper.start(gdbOutputRegExp).exec(record);
+
+        if (!match) {
+            return undefined;
+        }
+        else {
+            return {
+                GdbOutput: match[1]
+            };
+        }
+    };
 
     let parseRecord = (record: string) => {
-        let match = RegExpHelper.start(outOfBandRecordRegex).exec(record);
+        let result: any = parseOutOfBandRecord(record);
 
-        if (match) {
-            parseOutOfBandRecord(record);
+        if (result) {
+            return result;
         }
 
-        match = RegExpHelper.start(resultRegExp).exec(record);
+        result = parseResultRecord(record);
 
-        if (match) {
-            // parseResultRecord(record);
+        if (result) {
+            return result;
         }
+
+        result = parseGdbOutput(record);
+
+        return result;
     };
 
 
-    let match;
-
+    // let match;
+    let miObject: Array<any> = new Array();
     let lines: string[] = (output as string).split(/\r\n?/);
-
     lines.forEach(
-        (line) => {
-            if (match = outOfBandRecordRegex.exec(line)) {
-                if (match[1] && token === undefined && match[1] !== 'undefined')
-                {
-                    token = parseInt(match[1]);
-                }
-
-                if (match[2])
-                {
-                    const classMatch = asyncClassRegex.exec(line);
-                    let value = line.substr(classMatch[1].length);
-                    const asyncRecord = {
-                        isStream: false,
-                        type: asyncRecordType[match[2]],
-                        asyncClass: classMatch[1],
-                        output: []
-                    };
-                    let result;
-                    while (result = parseCommaResult(value))
-                    {
-                        asyncRecord.output.push(result);
-                    }
-                    outOfBandRecord.push(asyncRecord);
-                }
-                else if (match[3])
-                {
-                    const streamRecord = {
-                        isStream: true,
-                        type: streamRecordType[match[3]],
-                        content: parseCString(line)
-                    };
-                    outOfBandRecord.push(streamRecord);
-                }
-            }
-
-
-            if (match = resultRecordRegex.exec(line))
-            {
-                let value = line.substr(match[0].length);
-                if (match[1] && token === undefined)
-                {
-                    token = parseInt(match[1]);
-                }
-                resultRecords = {
-                    resultClass: match[2],
-                    results: []
-                };
-                let result;
-                while (result = parseCommaResult(value))
-                {
-                    resultRecords.results.push(result);
-                }
-            }
+        (record) => {
+            miObject.push(parseRecord(record));
         }
     );
+
+    // lines.forEach(
+    //     (line) => {
+    //         if (match = outOfBandRecordRegex.exec(line)) {
+    //             if (match[1] && token === undefined && match[1] !== 'undefined')
+    //             {
+    //                 token = parseInt(match[1]);
+    //             }
+
+    //             if (match[2])
+    //             {
+    //                 const classMatch = asyncClassRegex.exec(line);
+    //                 let value = line.substr(classMatch[1].length);
+    //                 const asyncRecord = {
+    //                     isStream: false,
+    //                     type: asyncRecordType[match[2]],
+    //                     asyncClass: classMatch[1],
+    //                     output: []
+    //                 };
+    //                 let result;
+    //                 while (result = parseCommaResult(value))
+    //                 {
+    //                     asyncRecord.output.push(result);
+    //                 }
+    //                 outOfBandRecord.push(asyncRecord);
+    //             }
+    //             else if (match[3])
+    //             {
+    //                 const streamRecord = {
+    //                     isStream: true,
+    //                     type: streamRecordType[match[3]],
+    //                     content: parseCString(line)
+    //                 };
+    //                 outOfBandRecord.push(streamRecord);
+    //             }
+    //         }
+
+
+    //         if (match = resultRecordRegex.exec(line))
+    //         {
+    //             let value = line.substr(match[0].length);
+    //             if (match[1] && token === undefined)
+    //             {
+    //                 token = parseInt(match[1]);
+    //             }
+    //             resultRecords = {
+    //                 resultClass: match[2],
+    //                 results: []
+    //             };
+    //             let result;
+    //             while (result = parseCommaResult(value))
+    //             {
+    //                 resultRecords.results.push(result);
+    //             }
+    //         }
+    //     }
+    // );
 
     // while (match = outOfBandRecordRegex.exec(output)) {
     //     output = output.substr(match[0].length);
@@ -800,5 +816,6 @@ export function parseMI(output: string): MINode {
     //     output = output.replace(newlineRegex, '');
     // }
 
-    return new MINode(token, outOfBandRecord as any || [], resultRecords);
+    return miObject;
+    // return new MINode(token, outOfBandRecord as any || [], resultRecords);
 }

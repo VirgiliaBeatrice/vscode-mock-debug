@@ -66,15 +66,24 @@ export class GDBDebugger extends BackendService implements IBackendService
 		console.log(`Command(${cmd}) finished.`);
 	}
 
-	public postProcess(content: string): MINode
+	public postProcess(content: string): Array<any>
 	{
 		console.log(content);
-		let record = parseMI(content);
-		console.log(record);
+		let records = parseMI(content);
+		console.log(records);
 
-		if (record.token) {
-			this.pendingTasks.get(record.token)(content);
-		}
-		return record;
+		records.forEach(
+			(record) => {
+				if (record.token) {
+					this.pendingTasks.get(record.token)(content);
+				}
+			}
+		);
+
+		return records;
+	// 	if (record.token) {
+	// 		this.pendingTasks.get(record.token)(content);
+	// 	}
+	// 	return record;
 	}
 }
