@@ -27,8 +27,9 @@ class RegExpPair implements IRegExpPair {
 
 interface IRegExpHelper
 {
-    or: (beggining: boolean, end: boolean, ...pairs: Array<IRegExpPair> | Array<IRegExpPair>) => RegExp;
-    add: (beggining: boolean, end: boolean, ...pairs: Array<IRegExpPair> | Array<IRegExpPair>) => RegExp;
+    or: (beginning: boolean, end: boolean, ...pairs: Array<IRegExpPair> | Array<IRegExpPair>) => RegExp;
+    add: (beginning: boolean, end: boolean, ...pairs: Array<IRegExpPair> | Array<IRegExpPair>) => RegExp;
+    anchor: (anchor: string, regExp: RegExp) => RegExp;
 }
 
 // let RegExpHelper: IRegExpHelper = {
@@ -94,6 +95,10 @@ class RegExpHelper {
                 end ? "$" : ""
             ].join("")
         );
+    }
+
+    static start(regExp: RegExp): RegExp {
+        return new RegExp("^" + regExp.source);
     }
 }
 
@@ -440,10 +445,13 @@ export function parseMI(output: string): MINode {
         return parseResult(value);
     };
 
+
+    const tokenRegExp = new RegExp(/\d*/);
     const constRegExp = new RegExp(/"."/);
     const tupleRegExp = new RegExp(/\{.*\}/);
     const listRegExp = new RegExp(/\[.*\]/);
-
+    const asyncClassRegExp = new RegExp(/(stopped)/);
+    const resultClassRegExp = new RegExp(/(done)|(running)|(connected)|(error)|(exit)/);
     const variableRegExp = new RegExp(/([a-zA-Z_\-][a-zA-Z0-9_\-]*)/);
     const valueRegExp: RegExp = RegExpHelper.or(
         false, false,
@@ -459,66 +467,224 @@ export function parseMI(output: string): MINode {
         new RegExpPair(valueRegExp)
     );
 
-    const asyncClassRegExp = new RegExp(/(stopped)/);
-    const resultClassRegExp = new RegExp(/(done)|(running)|(connected)|(error)|(exit)/);
-
-    const asyncOutputRegExp = new RegExp(/(\d)*([\*\+=])/);
-    const streamOutputRegExp = new RegExp(/([~@&])/);
-
-    const asyncRecordRegExp = RegExpHelper.add(
+    const gResultRegExp = RegExpHelper.add(
         false, false,
-        { regExp: asyncOutputRegExp, quantifier: "" },
-        { regExp: asyncClassRegExp, quantifier: "" },
-        {
-            regExp: RegExpHelper.add(
-                false, false,
-                { regExp: ",", quantifier: "" },
-                { regExp: resultRegExp, quantifier: ""}
-            ),
-            quantifier: "*"
-        }
+        new RegExpPair(","),
+        new RegExpPair(resultRegExp)
+    );
+
+    const asyncOutputRegExp = RegExpHelper.add(
+        false, false,
+        new RegExpPair(asyncClassRegExp),
+        new RegExpPair(gResultRegExp)
     );
 
 
-    parseResult = (result: string) => {
-        let variableMatch = variableRegExp.exec(result);
-        let valueMatch = valueRegExp.exec(result);
+    const gAsyncOutputRegExp = RegExpHelper.add(
+        false, false,
+        new RegExpPair(tokenRegExp, "?"),
+        new RegExpPair(/[\*\+=]/),
+        new RegExpPair(asyncOutputRegExp)
+    );
+    const gStreamOutputRegExp = RegExpHelper.add(
+        false, false,
+        new RegExpPair(/([~@&])/),
+        new RegExpPair(constRegExp)
+    );
 
-        return [
-            variableMatch[0],
-        ];
-    };
 
-    let parseContent = (content: string) => {
-        if (content[0] !== ',') {
+    const asyncRecordRegExp = gAsyncOutputRegExp;
+    const streamRecordRegExp = gStreamOutputRegExp;
+    const resultRecordRegExp = RegExpHelper.add(
+        false, false,
+        new RegExpPair(tokenRegExp, "?"),
+        new RegExpPair("^"),
+        new RegExpPair(resultClassRegExp),
+        new RegExpPair(gResultRegExp, "*")
+    );
+
+    const gdbOutputRegExp = new RegExp(/(gdb)/);
+
+    let parseConst = (value: string) => {
+        let match = RegExpHelper.start(constRegExp).exec(value);
+
+        if (!match) {
             return undefined;
         }
         else {
-            let subContent = content.substr(1);
-            let resultMatch: RegExpMatchArray = resultRegExp.exec(subContent);
-
-            // resultMatch[0]
-
+            return {
+                value: match[0]
+            };
         }
     };
 
-    let parseOutput = (output: string) => {
+    let parseList = (value: string) => {
+        let match =RegExpHelper.start(listRegExp).exec(value);
+
+        if (!match) {
+            return undefined;
+        }
+        else {
+            return {
+                value: parseResult(value.substr(match[0].length).slice(1, -1)),
+                result: parseResult(value.substr(match[0].length).slice(1, -1))
+            };
+        }
+    };
+
+    let parseTuple = (value: string) => {
+        let match = RegExpHelper.start(tupleRegExp).exec(value);
+
+        if (!match) {
+            return undefined;
+        }
+        else {
+            let result = parseResult(value.substr(match[0].length).slice(1, -1));
+
+            return {
+                result: result
+            };
+        }
+    };
+
+    parseValue = (value: string) => {
+        let result: any = parseConst(value);
+
+        if (result) {
+            return result;
+        }
+
+        result = parseTuple(value);
+
+        if (result) {
+            return result;
+        }
+
+        result = parseList(value);
+
+        return result;
+    };
+
+    parseResult = (result: string) => {
+        let match = RegExpHelper.start(gResultRegExp).exec(result);
+
+        if (!match) {
+            return undefined;
+        }
+        else {
+            let variable = match[3];
+            let value = parseValue(match[5]);
+
+            return {
+                variable: variable,
+                value: value
+            };
+        }
+
+    };
+
+    let parseAsyncOutput = (asyncOutput: string) => {
+        let match = RegExpHelper.start(asyncOutputRegExp).exec(asyncOutput);
+
+        if (!match) {
+            return undefined;
+        }
+        else {
+            let asyncClass = match[1];
+            let result = parseResult(
+                asyncOutput.substr(match[1].length)
+            );
+
+            return {
+                asyncClass: asyncClass,
+                result: result
+            };
+        }
 
     };
 
     let parseAsyncRecord = (record: string) => {
+        let match = RegExpHelper.start(asyncRecordRegExp).exec(record);
 
+        if (!match) {
+            return undefined;
+        }
+        else {
+            let token = match[1];
+            let type = asyncRecordType[match[2]];
+            let asyncOutput = parseAsyncOutput(
+                record.substr(match[1].length + match[2].length)
+            );
+
+            return {
+                token: token,
+                type: type,
+                asyncOutput: asyncOutput
+            };
+        }
+    };
+
+    let parseStreamRecord = (record: string) => {
+        let match = RegExpHelper.start(streamRecordRegExp).exec(record);
+
+        if (!match) {
+            return undefined;
+        }
+        else {
+            return {
+                type: streamRecordType[match[1]],
+                streamOutput: parseConst(match[2])
+            };
+        }
     };
 
     let parseOutOfBandRecord = (record: string) => {
+        let result: any = parseAsyncRecord(record);
 
+        if (result) {
+            return result;
+        }
+
+        result = parseStreamRecord(record);
+
+        if (result)
+        {
+            return result;
+        }
+
+        // let match = RegExpHelper.start(asyncRecordRegExp).exec(record);
+
+        // if (match) {
+        //     if (match[1]) {
+        //         let token = parseInt(match[1]);
+        //     }
+
+        //     let asyncRecord = {
+        //         isStream: false,
+        //         type: asyncRecordType[match[2]],
+        //         asyncClass: parseAsyncRecord(record),
+        //         output: []
+        //     };
+
+
+        // }
     };
 
+    // let parseResultRecord = (record: string) => {
+    //     let match = RegExpHelper.start()
+    // };
+
     let parseRecord = (record: string) => {
-        let match = outOfBandRecordRegex.exec(record);
+        let match = RegExpHelper.start(outOfBandRecordRegex).exec(record);
 
         if (match) {
+            parseOutOfBandRecord(record);
+        }
 
+        match = RegExpHelper.start(resultRegExp).exec(record);
+
+        if (match) {
+            // parseResultRecord(record);
         }
     };
 
