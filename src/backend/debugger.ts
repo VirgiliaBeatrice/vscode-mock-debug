@@ -1,5 +1,6 @@
 import { BackendService, IBackendService, ServiceType } from "./service";
 import { MINode, parseMI } from "./mi_parse";
+import { DebugProtocol } from "vscode-debugprotocol";
 
 interface Task {
 	callback: Function;
@@ -59,11 +60,21 @@ export class GDBDebugger extends BackendService implements IBackendService
 		);
 	}
 
-	public async excuteCommand(cmd: string): Promise<any> {
+	public async executeCommand(cmd: string): Promise<any> {
 		let record = await this.sendCommand(cmd);
 
 		this.pendingTasks.delete(record.token);
 		console.log(`Command No.${record.token} "${cmd}" finished.`);
+
+		return record;
+	}
+
+	public async executeCommands(cmds: string[]): Promise<void> {
+		cmds.forEach(
+			async (cmd) => {
+				await this.executeCommand(cmd);
+			}
+		);
 	}
 
 	public postProcess(content: string): Array<any>
@@ -85,5 +96,14 @@ export class GDBDebugger extends BackendService implements IBackendService
 	// 		this.pendingTasks.get(record.token)(content);
 	// 	}
 	// 	return record;
+	}
+
+	public clearBreakpoints(): Promise<boolean> {
+		return new Promise(
+			async (resolve, reject) => {
+				let record = await this.executeCommand("break-delete");
+
+			}
+		);
 	}
 }

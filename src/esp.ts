@@ -124,11 +124,12 @@ export class ESPDebugSession extends DebugSession {
 		this.debugger.on('output', (output, source) => {this.sendEvent(new AdapterOutputEvent(output, 'out', source));});
 		this.debugger.init().then(() => {
 			console.info("GDB debugger started.");
-			this.debugger.excuteCommand("interpreter-exec console \"target remote localhost:3333\"");
-			this.debugger.excuteCommand("file-exec-and-symbols .\\build\\hello-world.elf");
-			this.debugger.excuteCommand("interpreter-exec console \"monitor reset halt\"");
-			this.debugger.excuteCommand("break-insert -t -h app_main");
-			this.debugger.excuteCommand("exec-continue");
+			// this.debugger.executeCommands(this.controller.initCmds());
+			this.debugger.executeCommand("interpreter-exec console \"target remote localhost:3333\"");
+			this.debugger.executeCommand("file-exec-and-symbols .\\build\\hello-world.elf");
+			this.debugger.executeCommand("interpreter-exec console \"monitor reset halt\"");
+			this.debugger.executeCommand("break-insert -t -h app_main");
+			// this.debugger.executeCommand("exec-continue");
 		});
 
 		// this.controller.serverLaunchStarted();
@@ -146,6 +147,24 @@ export class ESPDebugSession extends DebugSession {
 
 		console.log("Get a launch request.");
 		this.sendResponse(response);
+
+	}
+
+	protected setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments): void {
+
+		const path: string = args.source.path;
+		const currentBreakpoints: DebugProtocol.SourceBreakpoint[] = args.breakpoints || [];
+
+		// Clear all bps for this file.
+
+		// Set and verify bp locations.
+		const actualBreakpoints = currentBreakpoints.map(
+			(bp) => {
+				this.debugger.sendCommand("set bp");
+			}
+		);
+
+
 
 	}
 
