@@ -1,6 +1,8 @@
 import { BackendService, IBackendService, ServiceType } from "./service";
 import { MINode, parseMI } from "./mi_parse";
 import { DebugProtocol } from "vscode-debugprotocol";
+import * as vscode from "vscode";
+import { instanceOfMIResult } from "./mi";
 
 interface Task {
 	callback: Function;
@@ -11,9 +13,11 @@ export class GDBDebugger extends BackendService implements IBackendService
 	public pendingTasks: Map<number, (string) => void> = new Map();
 	public incToken: number = 0;
 
+	private _breakpoints: Map<string, DebugProtocol.SourceBreakpoint[]> = new Map();
+
 	constructor(application: string, public root?: string, public cwd?: string, public path?: string[])
 	{
-		super("Subprocess for GDB Debugger Instance", ServiceType.Debugger, application, ["-q", "--interpreter=mi2"]);
+		super("Subprocess for GDB Debugger Instance", ServiceType.Debugger, application, ["-q", "--interpreter=mi2", "-s", "C:\\msys32\\home\\Iris\\esp\\hello_world\\build\\hello-world.elf"]);
 
 		if (this.root === undefined)
 		{
@@ -65,6 +69,15 @@ export class GDBDebugger extends BackendService implements IBackendService
 
 		this.pendingTasks.delete(record.token);
 		console.log(`Command No.${record.token} "${cmd}" finished.`);
+		console.log(`Command No.${record.token} result: ${JSON.stringify(record)}.`);
+
+		if (instanceOfMIResult(record)) {
+			switch (record.resultClass) {
+				case "done":
+					// this.emit()
+			}
+
+		}
 
 		return record;
 	}
@@ -98,12 +111,65 @@ export class GDBDebugger extends BackendService implements IBackendService
 	// 	return record;
 	}
 
-	public clearBreakpoints(): Promise<boolean> {
+	public async setBreakpoint(path: string, bp: DebugProtocol.SourceBreakpoint): Promise<any>
+	{
+		if (this._breakpoints.has(path)) {
+			this._breakpoints.get(path).push(bp);
+		}
+		else {
+			this._breakpoints.set(path, [ bp ]);
+		}
+
+		let result = await this.executeCommand(`break-insert ${path}:${bp.line} `);
+
+		return result;
+	}
+
+	public clearBreakpoints(path: string): void {
+		let bps = this._breakpoints.get(path) || [];
+
+		let deleteTasks = bps.map(
+			(bp) => {
+				this.clearBreakpoint(1);
+			}
+		);
+
+		Promise.all(deleteTasks).then(
+			() => {
+				return false;
+			}
+		);
+
+		// return new Promise(
+		// 	async (resolve, reject) => {
+		// 		let record = await this.executeCommand("break-delete");
+
+		// 	}
+		// );
+	}
+
+	public clearBreakpoint(number: number): Promise<any> {
 		return new Promise(
 			async (resolve, reject) => {
-				let record = await this.executeCommand("break-delete");
+				let result = await this.executeCommand(`break-delete ${number}`);
 
+				if (result.isDone) {
+					resolve(result);
+				}
+				else {
+					reject(false);
+				}
 			}
 		);
 	}
+}
+
+interface Breakpoint {
+	number: number;
+	addr: string;
+	file: string;
+	fullname: string;
+	line: number;
+	threadGroups: string[];
+	times: number;
 }

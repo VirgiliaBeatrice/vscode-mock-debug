@@ -523,10 +523,19 @@ export function parseMI(output: string): Array<any> {
             return undefined;
         }
         else {
-            return {
-                value: parseResult("," + value.slice(1, -1)),
-                result: parseResult("," + value.slice(1, -1))
-            };
+            let retValue = parseValue(value.slice(1, -1));
+            let retResult = parseResult(value.slice(1, -1));
+
+            if (retValue) {
+                return [retValue];
+            }
+            else {
+                return [retResult];
+            }
+            // return [
+            //     ...retValue,
+            //     retResult
+            // ];
         }
     };
 
@@ -539,9 +548,10 @@ export function parseMI(output: string): Array<any> {
         else {
             let result = parseResult("," + value.slice(1, -1));
 
-            return {
-                result: result
-            };
+            return result;
+            // return {
+            //     result: result
+            // };
         }
     };
 
@@ -572,25 +582,34 @@ export function parseMI(output: string): Array<any> {
         else {
             let variable = match[3];
             let value = parseValue(match[6]);
-            let remaining: Array<any> | undefined = parseResult(result.substr(match[0].length));
+            let remaining: Object | undefined = parseResult(result.substr(match[0].length));
+            let retValue = {};
+            retValue[variable] = value;
 
             if (remaining)
             {
-                return [
-                    {
-                        variable: variable,
-                        value: value
-                    },
+                return {
+                    ...retValue,
                     ...remaining
-                ];
+                };
+                // return [
+                //     {
+                //         variable: variable,
+                //         value: value
+                //     },
+                //     ...remaining
+                // ];
             }
             else{
-                return [
-                    {
-                        variable: variable,
-                        value: value
-                    }
-                ];
+                return {
+                    ...retValue
+                };
+                // return [
+                //     {
+                //         variable: variable,
+                //         value: value
+                //     }
+                // ];
             }
         }
 
@@ -676,7 +695,8 @@ export function parseMI(output: string): Array<any> {
             return {
                 token: parseInt(match[1]),
                 resultClass: match[3],
-                result: parseResult(record.substr(match[1].length + match[2].length + match[3].length))
+                // result: parseResult(record.substr(match[1].length + match[2].length + match[3].length))
+                ...parseResult(record.substr(match[1].length + match[2].length + match[3].length))
             };
         }
     };

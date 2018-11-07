@@ -1,12 +1,13 @@
 import { DebugProtocol } from "vscode-debugprotocol";
 // import { EventEmitter } from "events";
 // import * as ChildProcess from "child_process";
-import { DebugSession, TerminatedEvent, InitializedEvent, Event } from "vscode-debugadapter";
+import { DebugSession, TerminatedEvent, InitializedEvent, Event, Breakpoint, StoppedEvent } from "vscode-debugadapter";
 import { BackendService } from "./backend/service";
 import { GDBServerController, LaunchConfigurationArgs } from "./controller/gdb";
 import { OpenOCDDebugController } from "./controller/openocd";
 import { GDBDebugger } from "./backend/debugger";
 import { GDBServer } from "./backend/server";
+import { Subject } from "await-notify";
 
 export interface OpenOCDArgments {
 	cwd: string;
@@ -38,14 +39,18 @@ export class ESPDebugSession extends DebugSession {
 
 	protected quit: boolean;
 	protected started: boolean;
-	protected debugReady: boolean;
+	protected isDebugReady: boolean;
 	protected stopped: boolean;
+
+	private _debuggerReady: Subject = new Subject();
 
 	public constructor() {
 		super();
 
 		this.setDebuggerLinesStartAt1(false);
 		this.setDebuggerColumnsStartAt1(false);
+
+
 
 		console.log("Start a debug session.");
 	}
@@ -74,7 +79,7 @@ export class ESPDebugSession extends DebugSession {
 
 		this.quit = false;
 		this.started = false;
-		this.debugReady = false;
+		this.isDebugReady = false;
 		this.stopped = false;
 
 		// TODO: Run controller.
@@ -122,15 +127,27 @@ export class ESPDebugSession extends DebugSession {
 			this.controller.debuggerApplication()
 		);
 		this.debugger.on('output', (output, source) => {this.sendEvent(new AdapterOutputEvent(output, 'out', source));});
+
+		this.debugger.on("Stop", (threadId) =>
+		{
+			this.sendEvent(new StoppedEvent('stop', threadId));
+		});
+
 		this.debugger.init().then(() => {
 			console.info("GDB debugger started.");
 			// this.debugger.executeCommands(this.controller.initCmds());
 			this.debugger.executeCommand("interpreter-exec console \"target remote localhost:3333\"");
-			this.debugger.executeCommand("file-exec-and-symbols .\\build\\hello-world.elf");
+			// this.debugger.executeCommand("file-exec-and-symbols .\\build\\hello-world.elf");
 			this.debugger.executeCommand("interpreter-exec console \"monitor reset halt\"");
 			this.debugger.executeCommand("break-insert -t -h app_main");
 			// this.debugger.executeCommand("exec-continue");
+
+			this.isDebugReady = true;
+			this._debuggerReady.notifyAll();
+
+			this.debugger.executeCommand("exec-continue");
 		});
+
 
 		// this.controller.serverLaunchStarted();
 		// this.server.init().then(() => {
@@ -150,22 +167,33 @@ export class ESPDebugSession extends DebugSession {
 
 	}
 
-	protected setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments): void {
+	protected async setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments): Promise<any> {
 
 		const path: string = args.source.path;
 		const currentBreakpoints: DebugProtocol.SourceBreakpoint[] = args.breakpoints || [];
 
+		if (!this.isDebugReady){
+			await this._debuggerReady.wait(1000);
+		}
+
 		// Clear all bps for this file.
+		await this.debugger.clearBreakpoints(path);
 
 		// Set and verify bp locations.
 		const actualBreakpoints = currentBreakpoints.map(
 			(bp) => {
-				this.debugger.sendCommand("set bp");
+				this.debugger.setBreakpoint(path, bp);
+
+				let returnBp = new Breakpoint(true);
+				return returnBp;
 			}
 		);
 
+		response.body = {
+			breakpoints: actualBreakpoints
+		};
 
-
+		this.sendResponse(response);
 	}
 
 	protected disconnectRequest(response: DebugProtocol.DisconnectResponse, args: DebugProtocol.DisconnectArguments): void {
