@@ -2,10 +2,15 @@ import { BackendService, IBackendService, ServiceType } from "./service";
 import { MINode, parseMI } from "./mi_parse";
 import { DebugProtocol } from "vscode-debugprotocol";
 import * as vscode from "vscode";
-import { instanceOfMIResult } from "./mi";
+import { instanceOfMIResult, instanceOfMIAsyncRecord, instanceOfMIStream } from "./mi";
 
 interface Task {
 	callback: Function;
+}
+
+export enum DebuggerEvents {
+	ExecStopped = "1",
+
 }
 
 export class GDBDebugger extends BackendService implements IBackendService
@@ -44,6 +49,7 @@ export class GDBDebugger extends BackendService implements IBackendService
 	public sendCommand(cmd: string): Promise<any> {
 		this.incToken ++;
 		this.process.stdin.write(this.incToken.toString() + "-" + cmd + "\n");
+		console.log(`Send Command No.${this.incToken} "${cmd}"`);
 
 		return new Promise(
 			(resolve, reject) => {
@@ -71,14 +77,6 @@ export class GDBDebugger extends BackendService implements IBackendService
 		console.log(`Command No.${record.token} "${cmd}" finished.`);
 		console.log(`Command No.${record.token} result: ${JSON.stringify(record)}.`);
 
-		if (instanceOfMIResult(record)) {
-			switch (record.resultClass) {
-				case "done":
-					// this.emit()
-			}
-
-		}
-
 		return record;
 	}
 
@@ -101,6 +99,31 @@ export class GDBDebugger extends BackendService implements IBackendService
 				if (record.token) {
 					this.pendingTasks.get(record.token)(record);
 				}
+
+
+				if (instanceOfMIResult(record))
+				{
+					switch (record.resultClass)
+					{
+						case "done":
+
+						// this.emit()
+					}
+
+				}
+				else if (instanceOfMIAsyncRecord(record))
+				{
+					switch (record.asyncClass)
+					{
+						case "stopped":
+							this.emit(DebuggerEvents.ExecStopped, parseInt(record["thread-id"]));
+					}
+				}
+				else if (instanceOfMIStream(record))
+				{
+
+				}
+				else { }
 			}
 		);
 
@@ -161,6 +184,27 @@ export class GDBDebugger extends BackendService implements IBackendService
 				}
 			}
 		);
+	}
+
+	public async getThreads(threadId?: number): Promise<any> {
+		let result = await this.sendCommand(`thread-info`);
+
+		return result;
+	}
+
+	public async getBacktrace(): Promise<any> {
+		let result = await this.sendCommand("stack-list-frames");
+
+		return result;
+	}
+
+
+
+	public async getVariables(): Promise<any> {
+		let result = await this.sendCommand("interpreter-exec console \"select-frame 1\"");
+		result = await this.sendCommand("interpreter-exec console \"info variables\"");
+
+		return result;
 	}
 }
 

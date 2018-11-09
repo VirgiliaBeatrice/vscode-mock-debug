@@ -505,6 +505,21 @@ export function parseMI(output: string): Array<any> {
 
     const gdbOutputRegExp = new RegExp(/\(gdb\)/);
 
+    const quotationRegExp = new RegExp(/(\")/gm);
+    const backslashRegExp = new RegExp(/(\\{2})/gm);
+    const newlineRegExp = new RegExp(/(\\n)/gm);
+    const tabRegExp = new RegExp(/(\\t)/gm);
+
+
+    let escapeString = (str: string) => {
+        str = str.replace(quotationRegExp, "");
+        str = str.replace(newlineRegExp, "\n");
+        str = str.replace(tabRegExp, "\t");
+        // str.replace(backslashRegExp, "\\");
+
+        return str;
+    };
+
     let parseConst = (value: string) => {
         let match = RegExpHelper.start(constRegExp).exec(value);
 
@@ -512,7 +527,8 @@ export function parseMI(output: string): Array<any> {
             return undefined;
         }
         else {
-            return match[0];
+            return escapeString(match[0]);
+            // return match[0];
         }
     };
 
@@ -524,9 +540,10 @@ export function parseMI(output: string): Array<any> {
         }
         else {
             let retValue = parseValue(value.slice(1, -1));
-            let retResult = parseResult(value.slice(1, -1));
+            let retResult = parseResult("," + value.slice(1, -1));
 
             if (retValue) {
+                // return [parseString(retValue)];
                 return [retValue];
             }
             else {
@@ -629,7 +646,8 @@ export function parseMI(output: string): Array<any> {
 
             return {
                 asyncClass: asyncClass,
-                result: result
+                // result: result
+                ...result
             };
         }
 
@@ -645,13 +663,15 @@ export function parseMI(output: string): Array<any> {
             let token = parseInt(match[1]);
             let type = asyncRecordType[match[2]];
             let asyncOutput = parseAsyncOutput(match[0].slice(1));
-            let result = parseResult(record.substr(match[2].length + match[4].length));
+            // let result = parseResult(record.substr(match[2].length + match[4].length));
 
             return {
                 token: token,
                 type: type,
-                asyncOutput: asyncOutput,
-                result: result
+                ...asyncOutput,
+                // asyncOutput: asyncOutput,
+                // ...result
+                // result: result
             };
         }
     };

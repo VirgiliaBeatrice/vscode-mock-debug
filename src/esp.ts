@@ -1,13 +1,14 @@
 import { DebugProtocol } from "vscode-debugprotocol";
 // import { EventEmitter } from "events";
 // import * as ChildProcess from "child_process";
-import { DebugSession, TerminatedEvent, InitializedEvent, Event, Breakpoint, StoppedEvent } from "vscode-debugadapter";
+import { DebugSession, TerminatedEvent, InitializedEvent, Event, Breakpoint, StoppedEvent, Thread, StackFrame, Scope, Variable, Source } from "vscode-debugadapter";
 import { BackendService } from "./backend/service";
 import { GDBServerController, LaunchConfigurationArgs } from "./controller/gdb";
 import { OpenOCDDebugController } from "./controller/openocd";
-import { GDBDebugger } from "./backend/debugger";
+import { GDBDebugger, DebuggerEvents } from "./backend/debugger";
 import { GDBServer } from "./backend/server";
 import { Subject } from "await-notify";
+import { MIResultThread, MIResultBacktrace } from "./backend/mi";
 
 export interface OpenOCDArgments {
 	cwd: string;
@@ -39,10 +40,11 @@ export class ESPDebugSession extends DebugSession {
 
 	protected quit: boolean;
 	protected started: boolean;
-	protected isDebugReady: boolean;
+	protected isDebugReady: boolean = false;
 	protected stopped: boolean;
 
 	private _debuggerReady: Subject = new Subject();
+	private _initialized: Subject = new Subject();
 
 	public constructor() {
 		super();
@@ -128,24 +130,30 @@ export class ESPDebugSession extends DebugSession {
 		);
 		this.debugger.on('output', (output, source) => {this.sendEvent(new AdapterOutputEvent(output, 'out', source));});
 
-		this.debugger.on("Stop", (threadId) =>
-		{
-			this.sendEvent(new StoppedEvent('stop', threadId));
-		});
-
-		this.debugger.init().then(() => {
+		this.debugger.init().then(async () => {
 			console.info("GDB debugger started.");
-			// this.debugger.executeCommands(this.controller.initCmds());
-			this.debugger.executeCommand("interpreter-exec console \"target remote localhost:3333\"");
-			// this.debugger.executeCommand("file-exec-and-symbols .\\build\\hello-world.elf");
-			this.debugger.executeCommand("interpreter-exec console \"monitor reset halt\"");
-			this.debugger.executeCommand("break-insert -t -h app_main");
-			// this.debugger.executeCommand("exec-continue");
 
-			this.isDebugReady = true;
+			await Promise.all(
+				[
+					this.debugger.executeCommand("gdb-set target-async on"),
+					this.debugger.executeCommand("interpreter-exec console \"target remote localhost:3333\""),
+					this.debugger.executeCommand("interpreter-exec console \"monitor reset halt\""),
+					this.debugger.executeCommand("break-insert -t -h app_main")
+				]
+			);
+
+			await this.debugger.executeCommand("exec-continue");
+
 			this._debuggerReady.notifyAll();
 
-			this.debugger.executeCommand("exec-continue");
+			this.debugger.on(DebuggerEvents.ExecStopped, (threadId) =>
+			{
+				let e: DebugProtocol.StoppedEvent = new StoppedEvent('stop', threadId);
+				e.body.allThreadsStopped = true;
+
+				this.sendEvent(e);
+				console.log("Send a stop event.");
+			});
 		});
 
 
@@ -174,6 +182,7 @@ export class ESPDebugSession extends DebugSession {
 
 		if (!this.isDebugReady){
 			await this._debuggerReady.wait(1000);
+			this.isDebugReady = true;
 		}
 
 		// Clear all bps for this file.
@@ -193,6 +202,97 @@ export class ESPDebugSession extends DebugSession {
 			breakpoints: actualBreakpoints
 		};
 
+		this.sendResponse(response);
+	}
+
+	static CreateThreads(record: MIResultThread): Array<DebugProtocol.Thread> {
+		return record.threads.map(
+			(thread) =>
+			{
+				return new Thread(
+					parseInt(thread["id"]),
+					thread["target-id"]
+				);
+			}
+		);
+	}
+
+	protected async threadsRequest(response: DebugProtocol.ThreadsResponse): Promise<void> {
+		let record: MIResultThread = await this.debugger.getThreads();
+
+		response.body = {
+			threads: ESPDebugSession.CreateThreads(record)
+		};
+
+		this.sendResponse(response);
+	}
+	static CreateSource(frame: any): Source {
+		return new Source(
+			frame["file"],
+			frame["fullname"]
+		);
+	}
+
+	static CreateStackFrames(record: MIResultBacktrace): Array<DebugProtocol.StackFrame> {
+		return record.stack.map(
+			(stack) => {
+				let stackframe = new StackFrame(
+					parseInt(stack.frame["level"]),
+					stack.frame["func"]
+				);
+
+				if (stack.frame.hasOwnProperty("file"))
+				{
+					stackframe.source = ESPDebugSession.CreateSource(stack.frame);
+					stackframe.line = parseInt(stack.frame["line"]);
+
+					return stackframe;
+				}
+				else {
+					return stackframe;
+				}
+
+				// return new StackFrame(
+				// 	parseInt(frame["level"]),
+				// 	frame["file"],
+				// 	ESPDebugSession.CreateSource(frame),
+				// 	parseInt(frame["line"])
+				// );
+			}
+		);
+	}
+
+	protected async stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments): Promise<void> {
+		let record: MIResultBacktrace = await this.debugger.getBacktrace();
+
+		response.body = {
+			stackFrames: ESPDebugSession.CreateStackFrames(record),
+			totalFrames: 3
+		};
+		this.sendResponse(response);
+	}
+
+	protected scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments): void
+	{
+		response.body = {
+			scopes: [
+				new Scope("Global", 1, true),
+				new Scope("Local", 2, false)
+			]
+		};
+		this.sendResponse(response);
+	}
+
+	protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments): Promise<void>
+	{
+		let record = await this.debugger.getVariables();
+
+		response.body = {
+			variables: [
+				new Variable("aaa", "0x88888888"),
+				new Variable("bbb", "0x88888888"),
+			]
+		};
 		this.sendResponse(response);
 	}
 
