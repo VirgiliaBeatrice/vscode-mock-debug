@@ -520,6 +520,33 @@ export function parseMI(output: string): Array<any> {
         return str;
     };
 
+    let parseBalancedBrackets = (value: string, bracket?: "[" | "{" | string): any => {
+        let stack = [];
+
+        const balancedBrackets = {
+            "[": "]",
+            "{": "}"
+        };
+
+        if (value[0] !== bracket) {
+            return [-1, -1, undefined];
+        }
+
+        for (let idx = 0; idx < value.length; idx ++) {
+            if (value[idx] === bracket) {
+                stack.push(idx);
+            }
+            else if (value[idx] === balancedBrackets[bracket]) {
+                let openIdx = stack.pop();
+                let closeIdx = idx;
+
+                if (stack.length === 0) {
+                    return [openIdx, closeIdx, value.slice(closeIdx + 1)];
+                }
+            }
+        }
+    };
+
     let parseConst = (value: string) => {
         let match = RegExpHelper.start(constRegExp).exec(value);
 
@@ -527,49 +554,105 @@ export function parseMI(output: string): Array<any> {
             return undefined;
         }
         else {
-            return escapeString(match[0]);
+            return [escapeString(match[0])];
             // return match[0];
         }
     };
 
     let parseList = (value: string) => {
-        let match =RegExpHelper.start(listRegExp).exec(value);
+        let [openIdx, closeIdx, remaining] = parseBalancedBrackets(value, "[");
 
-        if (!match) {
+        if (openIdx === -1 && closeIdx === -1) {
             return undefined;
         }
         else {
-            let retValue = parseValue(value.slice(1, -1));
-            let retResult = parseResult("," + value.slice(1, -1));
+            let retValue = parseValue(value.slice(openIdx + 1, closeIdx));
+            let retResult = parseResult("," + value.substring(openIdx, closeIdx));
+            let retOthers = parseResult(remaining);
 
             if (retValue) {
                 // return [parseString(retValue)];
-                return [retValue];
+                return [...retValue];
             }
             else {
                 return [retResult];
             }
+        }
+
+        // let match =RegExpHelper.start(listRegExp).exec(value);
+
+        // if (!match) {
+        //     return undefined;
+        // }
+        // else {
+        //     let retValue = parseValue(value.slice(1, -1));
+        //     let retResult = parseResult("," + value.slice(1, -1));
+
+        //     if (retValue) {
+        //         // return [parseString(retValue)];
+        //         return [retValue];
+        //     }
+        //     else {
+        //         return [retResult];
+        //     }
             // return [
             //     ...retValue,
             //     retResult
             // ];
-        }
+        // }
     };
 
     let parseTuple = (value: string) => {
-        let match = RegExpHelper.start(tupleRegExp).exec(value);
+        let [openIdx, closeIdx, remaining] = parseBalancedBrackets(value, "{");
 
-        if (!match) {
+        if (openIdx === -1 && closeIdx === -1) {
             return undefined;
         }
         else {
-            let result = parseResult("," + value.slice(1, -1));
+            let result = parseResult("," + value.substring(openIdx + 1, closeIdx - 1));
+            let others = parseResult(remaining);
 
-            return result;
-            // return {
-            //     result: result
-            // };
+            if (others) {
+                return [
+                    ...result,
+                    ...others
+                ];
+            }
+            else {
+                return [...result];
+            }
         }
+        // let match = RegExpHelper.start(tupleRegExp).exec(value);
+
+        // if (!match) {
+        //     return undefined;
+        // }
+        // else {
+        //     let result = parseResult("," + value.slice(1, -1));
+
+        //     return result;
+        //     // return {
+        //     //     result: result
+        //     // };
+        // }
+    };
+
+    let parseValueInList = (value: string) => {
+        let result: any = parseConst(value);
+
+        if (result) {
+            return result;
+        }
+
+        result = parseTuple(value);
+
+        if (result) {
+            return [result];
+        }
+
+        result = parseList(value);
+
+        return result;
     };
 
     let parseValue = (value: string) => {
@@ -599,16 +682,16 @@ export function parseMI(output: string): Array<any> {
         else {
             let variable = match[3];
             let value = parseValue(match[6]);
-            let remaining: Object | undefined = parseResult(result.substr(match[0].length));
+            let remaining: Array<any> | undefined = parseResult(result.substr(match[0].length));
             let retValue = {};
             retValue[variable] = value;
 
             if (remaining)
             {
-                return {
-                    ...retValue,
+                return [
+                    retValue,
                     ...remaining
-                };
+                ];
                 // return [
                 //     {
                 //         variable: variable,
@@ -618,9 +701,9 @@ export function parseMI(output: string): Array<any> {
                 // ];
             }
             else{
-                return {
-                    ...retValue
-                };
+                return [
+                    retValue
+                ];
                 // return [
                 //     {
                 //         variable: variable,
@@ -629,8 +712,48 @@ export function parseMI(output: string): Array<any> {
                 // ];
             }
         }
-
     };
+
+    // let parseResult = (result: string) => {
+    //     let match = RegExpHelper.start(gResultRegExp).exec(result);
+
+    //     if (!match) {
+    //         return undefined;
+    //     }
+    //     else {
+    //         let variable = match[3];
+    //         let value = parseValue(match[6]);
+    //         let remaining: Object | undefined = parseResult(result.substr(match[0].length));
+    //         let retValue = {};
+    //         retValue[variable] = value;
+
+    //         if (remaining)
+    //         {
+    //             return {
+    //                 ...retValue,
+    //                 ...remaining
+    //             };
+    //             // return [
+    //             //     {
+    //             //         variable: variable,
+    //             //         value: value
+    //             //     },
+    //             //     ...remaining
+    //             // ];
+    //         }
+    //         else{
+    //             return {
+    //                 ...retValue
+    //             };
+    //             // return [
+    //             //     {
+    //             //         variable: variable,
+    //             //         value: value
+    //             //     }
+    //             // ];
+    //         }
+    //     }
+    // };
 
     let parseAsyncOutput = (asyncOutput: string) => {
         let match = RegExpHelper.start(asyncOutputRegExp).exec(asyncOutput);
