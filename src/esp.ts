@@ -110,7 +110,7 @@ export class ESPDebugSession extends DebugSession {
 			console.log(`Server process exited. CODE: ${code} SIGNAL:  ${signal}`);
 		});
 
-		this.server.init().then(
+		this.server.start().then(
 			() => {
 				console.info("OpenOCD server started.");
 			},
@@ -130,7 +130,16 @@ export class ESPDebugSession extends DebugSession {
 		);
 		this.debugger.on('output', (output, source) => {this.sendEvent(new AdapterOutputEvent(output, 'out', source));});
 
-		this.debugger.init().then(async () => {
+		this.debugger.on(DebuggerEvents.ExecStopped, (threadId) =>
+		{
+			let e: DebugProtocol.StoppedEvent = new StoppedEvent('stop', threadId);
+			e.body.allThreadsStopped = true;
+
+			this.sendEvent(e);
+			console.log("Send a stop event.");
+		});
+
+		this.debugger.start().then(async () => {
 			console.info("GDB debugger started.");
 
 			await Promise.all(
@@ -141,19 +150,11 @@ export class ESPDebugSession extends DebugSession {
 					this.debugger.executeCommand("break-insert -t -h app_main")
 				]
 			);
+			this._debuggerReady.notifyAll();
+			this.debugger.isInitialized = true;
 
 			await this.debugger.executeCommand("exec-continue");
 
-			this._debuggerReady.notifyAll();
-
-			this.debugger.on(DebuggerEvents.ExecStopped, (threadId) =>
-			{
-				let e: DebugProtocol.StoppedEvent = new StoppedEvent('stop', threadId);
-				e.body.allThreadsStopped = true;
-
-				this.sendEvent(e);
-				console.log("Send a stop event.");
-			});
 		});
 
 
@@ -181,7 +182,7 @@ export class ESPDebugSession extends DebugSession {
 		const currentBreakpoints: DebugProtocol.SourceBreakpoint[] = args.breakpoints || [];
 
 		if (!this.isDebugReady){
-			await this._debuggerReady.wait(1000);
+			await this._debuggerReady.wait(60000);
 			this.isDebugReady = true;
 		}
 
@@ -201,6 +202,8 @@ export class ESPDebugSession extends DebugSession {
 		response.body = {
 			breakpoints: actualBreakpoints
 		};
+
+
 
 		this.sendResponse(response);
 	}
@@ -226,6 +229,7 @@ export class ESPDebugSession extends DebugSession {
 
 		this.sendResponse(response);
 	}
+
 	static CreateSource(frame: any): Source {
 		return new Source(
 			frame["file"],

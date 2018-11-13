@@ -17,6 +17,7 @@ export class GDBDebugger extends BackendService implements IBackendService
 {
 	public pendingTasks: Map<number, (string) => void> = new Map();
 	public incToken: number = 0;
+	public isInitialized: boolean = false;
 
 	private _breakpoints: Map<string, DebugProtocol.SourceBreakpoint[]> = new Map();
 
@@ -116,7 +117,9 @@ export class GDBDebugger extends BackendService implements IBackendService
 					switch (record.asyncClass)
 					{
 						case "stopped":
-							this.emit(DebuggerEvents.ExecStopped, parseInt(record["thread-id"]));
+							if (this.isInitialized){
+								this.emit(DebuggerEvents.ExecStopped, parseInt(record["thread-id"]));
+							}
 					}
 				}
 				else if (instanceOfMIStream(record))
@@ -187,13 +190,13 @@ export class GDBDebugger extends BackendService implements IBackendService
 	}
 
 	public async getThreads(threadId?: number): Promise<any> {
-		let result = await this.sendCommand(`thread-info`);
+		let result = await this.executeCommand(`thread-info`);
 
 		return result;
 	}
 
 	public async getBacktrace(): Promise<any> {
-		let result = await this.sendCommand("stack-list-frames");
+		let result = await this.executeCommand("stack-list-frames");
 
 		return result;
 	}
@@ -201,8 +204,8 @@ export class GDBDebugger extends BackendService implements IBackendService
 
 
 	public async getVariables(): Promise<any> {
-		let result = await this.sendCommand("interpreter-exec console \"select-frame 1\"");
-		result = await this.sendCommand("interpreter-exec console \"info variables\"");
+		let result = await this.executeCommand("interpreter-exec console \"select-frame 1\"");
+		result = await this.executeCommand("interpreter-exec console \"info variables\"");
 
 		return result;
 	}

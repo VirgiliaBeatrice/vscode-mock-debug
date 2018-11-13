@@ -27,7 +27,7 @@ export interface IBackendService extends EventEmitter {
 
 	postProcess: (content: string) => MINode | void | Array<any>;
 
-	init: () => Thenable<any>;
+	start: () => Thenable<any>;
 	exit: () => void;
 
 	// serverEnv: (root: string, paths: string[]) => Object;
@@ -58,7 +58,7 @@ export class BackendService extends EventEmitter implements IBackendService  {
 	}
 
 
-	public init(): Thenable<any> {
+	public start(): Thenable<any> {
 		return new Promise((resolve, reject) => {
 			if (this.application !== null) {
 				this.initResolve = resolve;

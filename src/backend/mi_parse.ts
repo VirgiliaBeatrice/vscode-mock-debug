@@ -528,6 +528,10 @@ export function parseMI(output: string): Array<any> {
             "{": "}"
         };
 
+        if (value === ""){
+            return [-1, -1, undefined];
+        }
+
         if (value[0] !== bracket) {
             return [-1, -1, undefined];
         }
@@ -551,10 +555,13 @@ export function parseMI(output: string): Array<any> {
         let match = RegExpHelper.start(constRegExp).exec(value);
 
         if (!match) {
-            return undefined;
+            return [undefined, undefined];
         }
         else {
-            return [escapeString(match[0])];
+            return [
+                escapeString(match[0]),
+                value.substr(match[0].length)
+            ];
             // return match[0];
         }
     };
@@ -563,19 +570,19 @@ export function parseMI(output: string): Array<any> {
         let [openIdx, closeIdx, remaining] = parseBalancedBrackets(value, "[");
 
         if (openIdx === -1 && closeIdx === -1) {
-            return undefined;
+            return [undefined, undefined];
         }
         else {
-            let retValue = parseValue(value.slice(openIdx + 1, closeIdx));
-            let retResult = parseResult("," + value.substring(openIdx, closeIdx));
-            let retOthers = parseResult(remaining);
+            let retValue = parseValues(value.slice(openIdx + 1, closeIdx));
+            let retResult = parseResult("," + value.substring(openIdx, closeIdx + 1));
+            // let retOthers = parseResult(remaining);
 
             if (retValue) {
                 // return [parseString(retValue)];
-                return [...retValue];
+                return [[retValue], remaining];
             }
             else {
-                return [retResult];
+                return [[retResult], remaining];
             }
         }
 
@@ -606,21 +613,13 @@ export function parseMI(output: string): Array<any> {
         let [openIdx, closeIdx, remaining] = parseBalancedBrackets(value, "{");
 
         if (openIdx === -1 && closeIdx === -1) {
-            return undefined;
+            return [undefined, undefined];
         }
         else {
-            let result = parseResult("," + value.substring(openIdx + 1, closeIdx - 1));
-            let others = parseResult(remaining);
+            let result: Array<any> = parseResult("," + value.substring(openIdx + 1, closeIdx));
+            // let others = parseResult(remaining);
 
-            if (others) {
-                return [
-                    ...result,
-                    ...others
-                ];
-            }
-            else {
-                return [...result];
-            }
+            return [Object.assign({}, ...result), remaining];
         }
         // let match = RegExpHelper.start(tupleRegExp).exec(value);
 
@@ -635,24 +634,6 @@ export function parseMI(output: string): Array<any> {
         //     //     result: result
         //     // };
         // }
-    };
-
-    let parseValueInList = (value: string) => {
-        let result: any = parseConst(value);
-
-        if (result) {
-            return result;
-        }
-
-        result = parseTuple(value);
-
-        if (result) {
-            return [result];
-        }
-
-        result = parseList(value);
-
-        return result;
     };
 
     let parseValue = (value: string) => {
@@ -673,6 +654,30 @@ export function parseMI(output: string): Array<any> {
         return result;
     };
 
+    let parseValues = (values: string) => {
+        if (values === "") {
+            return undefined;
+        }
+        let [result, remaining]: any = parseConst(values);
+
+        if (!result) {
+            [result, remaining] = parseTuple(values);
+
+            if (!result) {
+                [result, remaining] = parseList(values);
+            }
+        }
+
+        let retRemaining = parseValues(remaining);
+
+        if (retRemaining) {
+            return Object.assign({}, result, remaining);
+        }
+        else {
+            return result;
+        }
+    };
+
     let parseResult = (result: string) => {
         let match = RegExpHelper.start(gResultRegExp).exec(result);
 
@@ -681,7 +686,7 @@ export function parseMI(output: string): Array<any> {
         }
         else {
             let variable = match[3];
-            let value = parseValue(match[6]);
+            let value = parseValues(match[6]);
             let remaining: Array<any> | undefined = parseResult(result.substr(match[0].length));
             let retValue = {};
             retValue[variable] = value;
@@ -767,11 +772,15 @@ export function parseMI(output: string): Array<any> {
                 asyncOutput.substr(match[1].length)
             );
 
-            return {
-                asyncClass: asyncClass,
-                // result: result
+            return Object.assign(
+                { asyncClass: asyncClass },
                 ...result
-            };
+            );
+            // return {
+            //     asyncClass: asyncClass,
+            //     // result: result
+            //     ...result
+            // };
         }
 
     };
@@ -835,12 +844,22 @@ export function parseMI(output: string): Array<any> {
             return undefined;
         }
         else {
-            return {
-                token: parseInt(match[1]),
-                resultClass: match[3],
-                // result: parseResult(record.substr(match[1].length + match[2].length + match[3].length))
-                ...parseResult(record.substr(match[1].length + match[2].length + match[3].length))
-            };
+            let result = parseResult(record.substr(match[1].length + match[2].length + match[3].length));
+
+            if (!result) {
+                return {
+                    token: parseInt(match[1]),
+                    resultClass: match[3]
+                };
+            }
+            else{
+                return {
+                    token: parseInt(match[1]),
+                    resultClass: match[3],
+                    // result: parseResult(record.substr(match[1].length + match[2].length + match[3].length))
+                    ...Object.assign({}, ...result)
+                };
+            }
         }
     };
 
