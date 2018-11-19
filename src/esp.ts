@@ -70,7 +70,9 @@ export class ESPDebugSession extends DebugSession {
 		console.log("Send an initialized event.");
 	}
 
-	protected launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchConfigurationArgs): void {
+	protected async launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchConfigurationArgs): Promise<any> {
+		console.log("Get a launch request.");
+
 		this.args = args;
 		// this.controller.on('event', this.controllerEvent.bind(this));
 
@@ -110,14 +112,17 @@ export class ESPDebugSession extends DebugSession {
 			console.log(`Server process exited. CODE: ${code} SIGNAL:  ${signal}`);
 		});
 
-		this.server.start().then(
-			() => {
-				console.info("OpenOCD server started.");
-			},
-			() => {
-				this.server.emit('lauhcherror', 103, response);
-			}
-		);
+		await this.server.start();
+		console.info("OpenOCD server started.");
+
+		// this.server.start().then(
+		// 	() => {
+		// 		console.info("OpenOCD server started.");
+		// 	},
+		// 	() => {
+		// 		this.server.emit('lauhcherror', 103, response);
+		// 	}
+		// );
 
 		// TODO: Run debugger
 		// this.debugger = new BackendService(
@@ -139,23 +144,38 @@ export class ESPDebugSession extends DebugSession {
 			console.log("Send a stop event.");
 		});
 
-		this.debugger.start().then(async () => {
-			console.info("GDB debugger started.");
+		await this.debugger.start();
+		console.info("GDB debugger started.");
+		this.debugger.run();
 
-			await Promise.all(
-				[
-					this.debugger.executeCommand("gdb-set target-async on"),
-					this.debugger.executeCommand("interpreter-exec console \"target remote localhost:3333\""),
-					this.debugger.executeCommand("interpreter-exec console \"monitor reset halt\""),
-					this.debugger.executeCommand("break-insert -t -h app_main")
-				]
-			);
-			this._debuggerReady.notifyAll();
-			this.debugger.isInitialized = true;
+		await this.debugger.enqueueTask("interpreter-exec console \"target remote localhost:3333\"");
+		await this.debugger.enqueueTask("interpreter-exec console \"monitor reset halt\"");
+		await this.debugger.enqueueTask("break-insert -t -h app_main");
+		await this.debugger.enqueueTask("exec-continue");
 
-			await this.debugger.executeCommand("exec-continue");
+		this._debuggerReady.notifyAll();
+		this.debugger.isInitialized = true;
 
-		});
+		// this.debugger.start().then(async () => {
+		// 	console.info("GDB debugger started.");
+		// 	this.debugger.run();
+
+
+		// 	await this.debugger.enqueueTask("interpreter-exec console \"target remote localhost:3333\"");
+		// 	// await Promise.all(
+		// 	// 	[
+		// 	// 		this.debugger.executeCommand("gdb-set target-async on"),
+		// 	// 		this.debugger.executeCommand("interpreter-exec console \"target remote localhost:3333\""),
+		// 	// 		this.debugger.executeCommand("interpreter-exec console \"monitor reset halt\""),
+		// 	// 		this.debugger.executeCommand("break-insert -t -h app_main")
+		// 	// 	]
+		// 	// );
+		// 	this._debuggerReady.notifyAll();
+		// 	this.debugger.isInitialized = true;
+
+		// 	// await this.debugger.executeCommand("exec-continue");
+
+		// });
 
 
 		// this.controller.serverLaunchStarted();
@@ -171,7 +191,6 @@ export class ESPDebugSession extends DebugSession {
 		// 2. Run server
 		// 3. Register events
 
-		console.log("Get a launch request.");
 		this.sendResponse(response);
 
 	}
@@ -221,6 +240,11 @@ export class ESPDebugSession extends DebugSession {
 	}
 
 	protected async threadsRequest(response: DebugProtocol.ThreadsResponse): Promise<void> {
+		if (!this.isDebugReady)
+		{
+			await this._debuggerReady.wait(60000);
+			this.isDebugReady = true;
+		}
 		let record: MIResultThread = await this.debugger.getThreads();
 
 		response.body = {

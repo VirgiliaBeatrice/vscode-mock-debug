@@ -5,7 +5,9 @@ import * as vscode from "vscode";
 import { instanceOfMIResult, instanceOfMIAsyncRecord, instanceOfMIStream } from "./mi";
 
 interface Task {
-	callback: Function;
+	token: number;
+	cmd: string;
+	onFinished: Function;
 }
 
 export enum DebuggerEvents {
@@ -18,6 +20,11 @@ export class GDBDebugger extends BackendService implements IBackendService
 	public pendingTasks: Map<number, (string) => void> = new Map();
 	public incToken: number = 0;
 	public isInitialized: boolean = false;
+	public isRunning: boolean = false;
+
+	private _taskQ: Array<Task> = [];
+	private _pendingTask: any = { onReceived: undefined };
+	private _waiters: Map<string, () => void> = new Map();
 
 	private _breakpoints: Map<string, DebugProtocol.SourceBreakpoint[]> = new Map();
 
@@ -45,6 +52,74 @@ export class GDBDebugger extends BackendService implements IBackendService
 			cwd: ".",
 			env: BackendService.parseEnv(this.root, this.path)
 		});
+
+		this._taskQ = [];
+	}
+
+	public enqueueTask(cmd: string): Promise<any> {
+
+		// wait for completing
+		return new Promise(
+			(resolve, reject) => {
+				let notify = (result) => {
+					resolve(result);
+				};
+
+				this.incToken ++;
+				let task = {
+					token: this.incToken,
+					cmd: cmd,
+					onFinished: notify
+				};
+				this._taskQ.push(task);
+
+			}
+		);
+	}
+
+	private _id;
+	public run(): void {
+		this._id = setInterval(
+			this.dispatchTask.bind(this), 10
+		);
+	}
+
+	public stop(): void {
+		clearInterval(this._id);
+	}
+
+	public async dispatchTask(): Promise<any> {
+		if (this._taskQ.length > 0) {
+			if (!this.isRunning) {
+				let task = this._taskQ.pop();
+				let result = await this.sendRaw(task);
+
+				// notify to original request
+				task.onFinished(result);
+				console.info(`Task ${task.token} finished.`);
+				console.info(`Result: ${JSON.stringify(result)}`);
+			}
+
+		}
+		// else {
+		// 	return Promise.resolve();
+		// }
+	}
+
+	public sendRaw(task: any): Promise<any> {
+
+		return new Promise(
+			(resolve, reject) => {
+				let notify = (result) => {
+					resolve(result);
+				};
+
+				this._pendingTask.onReceived = notify;
+				this.process.stdin.write(task.token.toString() + "-" + task.cmd + "\n");
+				console.log(`Send Command No.${task.token} "${task.cmd}"`);
+
+			}
+		);
 	}
 
 	public sendCommand(cmd: string): Promise<any> {
@@ -89,6 +164,19 @@ export class GDBDebugger extends BackendService implements IBackendService
 		);
 	}
 
+	public waitForNotify(waiter: string) {
+		return new Promise(
+			(resolve) => {
+				let callback = () =>
+				{
+					resolve();
+				};
+
+				this._waiters.set(waiter, callback);
+			}
+		);
+	}
+
 	public postProcess(content: string): Array<any>
 	{
 		// console.log(content);
@@ -98,7 +186,8 @@ export class GDBDebugger extends BackendService implements IBackendService
 		records.forEach(
 			(record) => {
 				if (record.token) {
-					this.pendingTasks.get(record.token)(record);
+					this._pendingTask.onReceived(record);
+					// this.pendingTasks.get(record.token)(record);
 				}
 
 
@@ -120,6 +209,15 @@ export class GDBDebugger extends BackendService implements IBackendService
 							if (this.isInitialized){
 								this.emit(DebuggerEvents.ExecStopped, parseInt(record["thread-id"]));
 							}
+							this.isRunning = false;
+
+							// if (this._waiters.has("Stop")) {
+							// 	this._waiters.get("Stop")();
+							// }
+							break;
+						case "running":
+							this.isRunning = true;
+							break;
 					}
 				}
 				else if (instanceOfMIStream(record))
@@ -190,7 +288,8 @@ export class GDBDebugger extends BackendService implements IBackendService
 	}
 
 	public async getThreads(threadId?: number): Promise<any> {
-		let result = await this.executeCommand(`thread-info`);
+		let result = await this.enqueueTask(`thread-info`);
+		// let result = await this.executeCommand(`thread-info`);
 
 		return result;
 	}
