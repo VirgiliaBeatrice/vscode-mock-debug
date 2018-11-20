@@ -94,7 +94,7 @@ export class ESPDebugSession extends DebugSession {
 		this.server = new GDBServer(
 			this.controller.serverApplication(),
 			this.controller.serverArgs(),
-			"C:\\msys32",
+			"C:\\msys64",
 			"."
 		);
 
@@ -290,8 +290,12 @@ export class ESPDebugSession extends DebugSession {
 		);
 	}
 
+	public selectedThreadId: number = 0;
+	public selectedFrameId: number = 0;
+
 	protected async stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments): Promise<void> {
-		let record: MIResultBacktrace = await this.debugger.getBacktrace();
+		let record: MIResultBacktrace = await this.debugger.getBacktrace(args.threadId);
+		this.selectedThreadId = args.threadId;
 
 		response.body = {
 			stackFrames: ESPDebugSession.CreateStackFrames(record),
@@ -302,6 +306,8 @@ export class ESPDebugSession extends DebugSession {
 
 	protected scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments): void
 	{
+		this.selectedFrameId = args.frameId;
+
 		response.body = {
 			scopes: [
 				new Scope("Global", 1, true),
@@ -311,16 +317,25 @@ export class ESPDebugSession extends DebugSession {
 		this.sendResponse(response);
 	}
 
+	static CreateVariables(record) {
+		return record.variables.map(
+			(variable) => {
+				return new Variable(
+					variable.name,
+					variable.value
+				);
+			}
+		);
+	}
+
 	protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments): Promise<void>
 	{
-		let record = await this.debugger.getVariables();
+		let record = await this.debugger.getVariables(this.selectedThreadId, this.selectedFrameId);
 
 		response.body = {
-			variables: [
-				new Variable("aaa", "0x88888888"),
-				new Variable("bbb", "0x88888888"),
-			]
+			variables: ESPDebugSession.CreateVariables(record)
 		};
+
 		this.sendResponse(response);
 	}
 

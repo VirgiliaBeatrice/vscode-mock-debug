@@ -15,18 +15,16 @@ class RegExpPair implements IRegExpPair {
     public quantifier = undefined;
 
     constructor(public regExp: RegExp | string, quantifier?: string) {
-        if (!quantifier)
-        {
+        if (!quantifier) {
             this.quantifier = "";
         }
         else {
             this.quantifier = quantifier;
         }
-     }
+    }
 }
 
-interface IRegExpHelper
-{
+interface IRegExpHelper {
     or: (beginning: boolean, end: boolean, ...pairs: Array<IRegExpPair> | Array<IRegExpPair>) => RegExp;
     add: (beginning: boolean, end: boolean, ...pairs: Array<IRegExpPair> | Array<IRegExpPair>) => RegExp;
     anchor: (anchor: string, regExp: RegExp) => RegExp;
@@ -50,20 +48,16 @@ class RegExpHelper {
 
     }
 
-    static or(beggining: boolean, end: boolean, ...pairs: Array<IRegExpPair> | Array<IRegExpPair>): RegExp
-    {
+    static or(beggining: boolean, end: boolean, ...pairs: Array<IRegExpPair> | Array<IRegExpPair>): RegExp {
         return new RegExp(
             [
                 beggining ? "^" : "",
                 pairs.map(
-                    (pair) =>
-                    {
-                        if (isRegExp(pair.regExp))
-                        {
+                    (pair) => {
+                        if (isRegExp(pair.regExp)) {
                             return `(${pair.regExp.source})${pair.quantifier}`;
                         }
-                        else
-                        {
+                        else {
                             return `(${pair.regExp})${pair.quantifier}`;
                         }
 
@@ -74,20 +68,16 @@ class RegExpHelper {
         );
     }
 
-    static add(beggining: boolean, end: boolean, ...pairs: Array<IRegExpPair> | Array<IRegExpPair>): RegExp
-    {
+    static add(beggining: boolean, end: boolean, ...pairs: Array<IRegExpPair> | Array<IRegExpPair>): RegExp {
         return new RegExp(
             [
                 beggining ? "^" : "",
                 pairs.map(
-                    (pair) =>
-                    {
-                        if (isRegExp(pair.regExp))
-                        {
+                    (pair) => {
+                        if (isRegExp(pair.regExp)) {
                             return `(${pair.regExp.source})${pair.quantifier}`;
                         }
-                        else
-                        {
+                        else {
                             return `(${pair.regExp})${pair.quantifier}`;
                         }
                     }
@@ -520,6 +510,56 @@ export function parseMI(output: string): Array<any> {
         return str;
     };
 
+    let parseBalancedBracketsNew = (value: string): [string, number, string] | undefined => {
+        let stack = [];
+
+        const balancedBrackets: Object = {
+            "[": "]",
+            "{": "}",
+            "\"": "\""
+        };
+
+
+        if (value === "" || !balancedBrackets.hasOwnProperty(value[0])) {
+            return undefined;
+        }
+
+        let openBracket = value[0];
+
+        if (openBracket === "\"") {
+            for (let idx = 0; idx < value.length; idx ++) {
+                if (value[idx] === openBracket) {
+                    if (stack.length === 0) {
+                        stack.push(idx);
+                    }
+                    else {
+                        stack.pop();
+                        let closeIdx = idx;
+                        return [openBracket, closeIdx, value.slice(closeIdx + 1)];
+                    }
+                }
+            }
+        }
+        else {
+            for (let idx = 0; idx < value.length; idx++) {
+                if (value[idx] === openBracket) {
+                    stack.push(idx);
+                }
+                else if (value[idx] === balancedBrackets[openBracket]) {
+                    // let openIdx = stack.pop();
+                    stack.pop();
+                    let closeIdx = idx;
+
+                    if (stack.length === 0) {
+                        return [openBracket, closeIdx, value.slice(closeIdx + 1)];
+                    }
+                }
+            }
+        }
+
+        return [undefined, undefined, undefined];
+    };
+
     let parseBalancedBrackets = (value: string, bracket?: "[" | "{" | string): any => {
         let stack = [];
 
@@ -528,7 +568,7 @@ export function parseMI(output: string): Array<any> {
             "{": "}"
         };
 
-        if (value === ""){
+        if (value === "") {
             return [-1, -1, undefined];
         }
 
@@ -536,7 +576,7 @@ export function parseMI(output: string): Array<any> {
             return [-1, -1, undefined];
         }
 
-        for (let idx = 0; idx < value.length; idx ++) {
+        for (let idx = 0; idx < value.length; idx++) {
             if (value[idx] === bracket) {
                 stack.push(idx);
             }
@@ -549,6 +589,10 @@ export function parseMI(output: string): Array<any> {
                 }
             }
         }
+    };
+
+    let parseConstNew = (value: string) => {
+        return escapeString(value);
     };
 
     let parseConst = (value: string) => {
@@ -564,6 +608,28 @@ export function parseMI(output: string): Array<any> {
             ];
             // return match[0];
         }
+    };
+
+    let parseListNew = (list: string) => {
+
+        let retResults = parseResults("," + list);
+        let retValues = parseValuesNew("," + list);
+
+        return retResults || retValues || [];
+        // let ret = retResults || retValues;
+
+        // if (ret) {
+        //     return ret;
+        // }
+        // else {
+        //     return [];
+        // }
+        // if (retValues) {
+        //     return retValues;
+        // }
+        // else {
+        //     return retResults;
+        // }
     };
 
     let parseList = (value: string) => {
@@ -602,11 +668,17 @@ export function parseMI(output: string): Array<any> {
         //     else {
         //         return [retResult];
         //     }
-            // return [
-            //     ...retValue,
-            //     retResult
-            // ];
+        // return [
+        //     ...retValue,
+        //     retResult
+        // ];
         // }
+    };
+
+    let parseTupleNew = (tuple: string) => {
+        let results = parseResults("," + tuple);
+
+        return Object.assign({}, ...results);
     };
 
     let parseTuple = (value: string) => {
@@ -654,6 +726,61 @@ export function parseMI(output: string): Array<any> {
         return result;
     };
 
+    let parseValueNew = (openBracket: string, value: string) => {
+        // if (value.length === 0) {
+        //     return undefined;
+        // }
+
+        let result, remaining = undefined;
+
+        switch (openBracket) {
+            case "\"":
+                result = parseConstNew(value);
+                break;
+            case "{":
+                result = parseTupleNew(value);
+                break;
+            case "[":
+                result = parseListNew(value);
+                break;
+            default:
+                [result, remaining] = [undefined, undefined];
+        }
+
+        return result;
+
+    };
+
+    let parseValuesNew = (values: string) => {
+        let match = RegExp(/^(,)((\")|(\{)|(\[))/).exec(values);
+
+        if (!match) {
+            return undefined;
+        }
+        else {
+            let [openBracket, closeIdx, remaining] = [undefined, undefined, undefined];
+            // if (match[3]) {
+                // [openBracket, closeIdx, remaining] = parseBalancedBracketsNew(values.substr(match[1].length));
+            // }
+            // else {
+                // [openBracket, closeIdx, remaining] = parseBalancedBracketsNew(values.substr(match[0].length));
+                // }
+            [openBracket, closeIdx, remaining] = parseBalancedBracketsNew(values.substr(match[1].length));
+            let value = parseValueNew(openBracket, values.substr(match[1].length + 1, closeIdx - 1));
+            let remainingValues = parseValuesNew(remaining);
+
+            if (remainingValues) {
+                return [
+                    value,
+                    ...remainingValues
+                ];
+            }
+            else {
+                return [value];
+            }
+        }
+    };
+
     let parseValues = (values: string) => {
         if (values === "") {
             return undefined;
@@ -678,6 +805,40 @@ export function parseMI(output: string): Array<any> {
         }
     };
 
+    let parseResults = (results: string) => {
+        let match = RegExp(/^(,)([a-zA-Z_\-][a-zA-Z0-9_\-]*)(=)/).exec(results);
+
+        if (!match) {
+            return undefined;
+        }
+        else {
+            let variable = match[2];
+            try {
+                let [openBracket, closeIdx, remaining] = parseBalancedBracketsNew(results.substr(match[0].length));
+                let value = parseValueNew(openBracket, results.substr(match[0].length + 1, closeIdx - 1));
+                let remainingResults = parseResults(remaining);
+                let retValue = {};
+                retValue[variable] = value;
+
+                if (remainingResults) {
+                    return [
+                        retValue,
+                        ...remainingResults
+                    ];
+                }
+                else {
+                    return [retValue];
+                }
+            } catch (error) {
+                console.log(`Exception captured. ${error}`);
+                console.log(`Context is: ${results}`);
+            }
+
+
+
+        }
+    };
+
     let parseResult = (result: string) => {
         let match = RegExpHelper.start(gResultRegExp).exec(result);
 
@@ -691,8 +852,7 @@ export function parseMI(output: string): Array<any> {
             let retValue = {};
             retValue[variable] = value;
 
-            if (remaining)
-            {
+            if (remaining) {
                 return [
                     retValue,
                     ...remaining
@@ -705,7 +865,7 @@ export function parseMI(output: string): Array<any> {
                 //     ...remaining
                 // ];
             }
-            else{
+            else {
                 return [
                     retValue
                 ];
@@ -817,7 +977,7 @@ export function parseMI(output: string): Array<any> {
         else {
             return {
                 type: streamRecordType[match[1]],
-                streamOutput: parseConst(match[3])
+                streamOutput: parseConstNew(match[3])
             };
         }
     };
@@ -831,8 +991,7 @@ export function parseMI(output: string): Array<any> {
 
         result = parseStreamRecord(record);
 
-        if (result)
-        {
+        if (result) {
             return result;
         }
     };
@@ -844,20 +1003,20 @@ export function parseMI(output: string): Array<any> {
             return undefined;
         }
         else {
-            let result = parseResult(record.substr(match[1].length + match[2].length + match[3].length));
+            let results = parseResults(record.substr(match[1].length + match[2].length + match[3].length));
 
-            if (!result) {
+            if (!results) {
                 return {
                     token: parseInt(match[1]),
                     resultClass: match[3]
                 };
             }
-            else{
+            else {
                 return {
                     token: parseInt(match[1]),
                     resultClass: match[3],
                     // result: parseResult(record.substr(match[1].length + match[2].length + match[3].length))
-                    ...Object.assign({}, ...result)
+                    ...Object.assign({}, ...results)
                 };
             }
         }
@@ -900,7 +1059,7 @@ export function parseMI(output: string): Array<any> {
     let lines: string[] = (output as string).split(/\r\n?/);
     lines.forEach(
         (record) => {
-            if (record !== ""){
+            if (record !== "") {
                 miObject.push(parseRecord(record));
             }
         }

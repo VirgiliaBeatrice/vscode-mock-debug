@@ -30,11 +30,11 @@ export class GDBDebugger extends BackendService implements IBackendService
 
 	constructor(application: string, public root?: string, public cwd?: string, public path?: string[])
 	{
-		super("Subprocess for GDB Debugger Instance", ServiceType.Debugger, application, ["-q", "--interpreter=mi2", "-s", "C:\\msys32\\home\\Iris\\esp\\hello_world\\build\\hello-world.elf"]);
+		super("Subprocess for GDB Debugger Instance", ServiceType.Debugger, application, ["-q", "--interpreter=mi2", "-s", "C:\\msys64\\home\\Haoyan.Li\\esp\\hello_world\\build\\hello-world.elf"]);
 
 		if (this.root === undefined)
 		{
-			this.root = "C:\\msys32";
+			this.root = "C:\\msys64";
 		}
 
 		if (this.path === undefined)
@@ -79,19 +79,19 @@ export class GDBDebugger extends BackendService implements IBackendService
 
 	private _id;
 	public run(): void {
-		this._id = setInterval(
+		this._id = setTimeout(
 			this.dispatchTask.bind(this), 10
 		);
 	}
 
-	public stop(): void {
-		clearInterval(this._id);
-	}
+	// public stop(): void {
+	// 	clearInterval(this._id);
+	// }
 
 	public async dispatchTask(): Promise<any> {
 		if (this._taskQ.length > 0) {
 			if (!this.isRunning) {
-				let task = this._taskQ.pop();
+				let task = this._taskQ.shift();
 				let result = await this.sendRaw(task);
 
 				// notify to original request
@@ -101,6 +101,8 @@ export class GDBDebugger extends BackendService implements IBackendService
 			}
 
 		}
+
+		this.run();
 		// else {
 		// 	return Promise.resolve();
 		// }
@@ -294,17 +296,20 @@ export class GDBDebugger extends BackendService implements IBackendService
 		return result;
 	}
 
-	public async getBacktrace(): Promise<any> {
-		let result = await this.executeCommand("stack-list-frames");
+	public async getBacktrace(threadId?: number): Promise<any> {
+		await this.enqueueTask(`thread-select ${threadId}`);
+		let result = await this.enqueueTask("stack-list-frames");
 
 		return result;
 	}
 
+	public async getScope(frameId?: number): Promise<any> {
+		await this.enqueueTask(`stack-select-frame ${frameId}`);
+		// let result = await this.enqueueTask(`stack-list`)
+	}
 
-
-	public async getVariables(): Promise<any> {
-		let result = await this.executeCommand("interpreter-exec console \"select-frame 1\"");
-		result = await this.executeCommand("interpreter-exec console \"info variables\"");
+	public async getVariables(threadId: number, frameId: number): Promise<any> {
+		let result = await this.enqueueTask(`stack-list-variables --thread ${threadId} --frame ${frameId} --simple-values`);
 
 		return result;
 	}

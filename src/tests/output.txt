@@ -1,0 +1,53 @@
+=thread-group-added,id="i1"
+~"Reading symbols from C:\\msys64\\home\\Haoyan.Li\\esp\\hello_world\\build\\hello-world.elf..."
+~"done.\n"
+(gdb)
+~"Remote debugging using localhost:3333\n"
+=thread-group-started,id="i1",pid="42000"
+=thread-created,id="1",group-id="i1"
+~"0x400e0f6a in esp_vApplicationWaitiHook () at C:/msys64/home/Haoyan.Li/esp/esp-idf/components/esp32/freertos_hooks.c:66\n"
+~"66\t    asm(\"waiti 0\");\n"
+*stopped,frame={addr="0x400e0f6a",func="esp_vApplicationWaitiHook",args=[],file="C:/msys64/home/Haoyan.Li/esp/esp-idf/components/esp32/freertos_hooks.c",fullname="C:\\msys64\\home\\Haoyan.Li\\esp\\esp-idf\\components\\esp32\\freertos_hooks.c",line="66"},thread-id="1",stopped-threads="all"
+1^done
+(gdb)
+@"JTAG tap: esp32.cpu0 tap/device found: 0x120034e5 (mfg: 0x272 (Tensilica), part: 0x2003, ver: 0x1)\n"
+@"JTAG tap: esp32.cpu1 tap/device found: 0x120034e5 (mfg: 0x272 (Tensilica), part: 0x2003, ver: 0x1)\n"
+@"cpu0: Current bits set: BreakIn BreakOut RunStallIn\n"
+@"cpu1: Current bits set: BreakIn BreakOut RunStallIn\n"
+@"esp32: Debug controller was reset (pwrstat=0x5F, after clear 0x0F).\n"
+@"esp32: Core was reset (pwrstat=0x5F, after clear 0x0F).\n"
+@"Target halted. PRO_CPU: PC=0x5000004B (active)    APP_CPU: PC=0x00000000 \n"
+@"esp32: Core was reset (pwrstat=0x1F, after clear 0x0F).\n"
+@"Target halted. PRO_CPU: PC=0x40000400 (active)    APP_CPU: PC=0x40000400 \n"
+2^done
+(gdb)
+3^done,bkpt={number="1",type="hw breakpoint",disp="del",enabled="y",addr="0x400d20a4",func="app_main",file="C:/msys64/home/Haoyan.Li/esp/hello_world/main/hello_world_main.c",fullname="C:\\msys64\\home\\Haoyan.Li\\esp\\hello_world\\main\\hello_world_main.c",line="17",thread-groups=["i1"],times="0",original-location="app_main"}
+(gdb)
+4^running
+*running,thread-id="all"
+(gdb)
+@"Target halted. PRO_CPU: PC=0x400D20A4 (active)    APP_CPU: PC=0x400E0F6A \n"
+=breakpoint-modified,bkpt={number="1",type="hw breakpoint",disp="del",enabled="y",addr="0x400d20a4",func="app_main",file="C:/msys64/home/Haoyan.Li/esp/hello_world/main/hello_world_main.c",fullname="C:\\msys64\\home\\Haoyan.Li\\esp\\hello_world\\main\\hello_world_main.c",line="17",thread-groups=["i1"],times="1",original-location="app_main"}
+=thread-created,id="2",group-id="i1"
+~"[New Thread 1073438816]\n"
+=thread-created,id="3",group-id="i1"
+~"[New Thread 1073436916]\n"
+=thread-created,id="4",group-id="i1"
+~"[New Thread 1073441472]\n"
+=thread-created,id="5",group-id="i1"
+~"[New Thread 1073429292]\n"
+=thread-created,id="6",group-id="i1"
+~"[New Thread 1073412744]\n"
+=thread-created,id="7",group-id="i1"
+~"[New Thread 1073413512]\n"
+=thread-created,id="8",group-id="i1"
+~"[New Thread 1073430424]\n"
+~"[Switching to Thread 1073434884]\n"
+~"\nTemporary breakpoint "
+~"1, app_main () at C:/msys64/home/Haoyan.Li/esp/hello_world/main/hello_world_main.c:17\n"
+~"17\t{\n"
+*stopped,reason="breakpoint-hit",disp="del",bkptno="1",frame={addr="0x400d20a4",func="app_main",args=[],file="C:/msys64/home/Haoyan.Li/esp/hello_world/main/hello_world_main.c",fullname="C:\\msys64\\home\\Haoyan.Li\\esp\\hello_world\\main\\hello_world_main.c",line="17"},thread-id="1",stopped-threads="all"
+=breakpoint-deleted,id="1"
+(gdb)
+5^done,threads=[{id="8",target-id="Thread 1073430424",details="dport",frame={level="0",addr="0x400847f6",func="vTaskDelete",args=[{name="xTaskToDelete",value="<optimized out>"}],file="C:/msys64/home/Haoyan.Li/esp/esp-idf/components/freertos/tasks.c",fullname="C:\\msys64\\home\\Haoyan.Li\\esp\\esp-idf\\components\\freertos\\tasks.c",line="1316"},state="stopped"},{id="7",target-id="Thread 1073413512",details="ipc0",frame={level="0",addr="0x40085a69",func="xQueueGenericReceive",args=[{name="xQueue",value="0x3ffafd34"},{name="pvBuffer",value="0x0"},{name="xTicksToWait",value="34402333"},{name="xJustPeeking",value="0"}],file="C:/msys64/home/Haoyan.Li/esp/esp-idf/components/freertos/queue.c",fullname="C:\\msys64\\home\\Haoyan.Li\\esp\\esp-idf\\components\\freertos\\queue.c",line="1591"},state="stopped"},{id="6",target-id="Thread 1073412744",details="esp_timer",frame={level="0",addr="0x40085a69",func="xQueueGenericReceive",args=[{name="xQueue",value="0x3ffaea30"},{name="pvBuffer",value="0x0"},{name="xTicksToWait",value="34402333"},{name="xJustPeeking",value="0"}],file="C:/msys64/home/Haoyan.Li/esp/esp-idf/components/freertos/queue.c",fullname="C:\\msys64\\home\\Haoyan.Li\\esp\\esp-idf\\components\\freertos\\queue.c",line="1591"},state="stopped"},{id="5",target-id="Thread 1073429292",details="ipc1",frame={level="0",addr="0x40085a69",func="xQueueGenericReceive",args=[{name="xQueue",value="0x3ffafef0"},{name="pvBuffer",value="0x0"},{name="xTicksToWait",value="34402333"},{name="xJustPeeking",value="0"}],file="C:/msys64/home/Haoyan.Li/esp/esp-idf/components/freertos/queue.c",fullname="C:\\msys64\\home\\Haoyan.Li\\esp\\esp-idf\\components\\freertos\\queue.c",line="1591"},state="stopped"},{id="4",target-id="Thread 1073441472",details="Tmr Svc",frame={level="0",addr="0x400861d0",func="prvProcessTimerOrBlockTask",args=[{name="xNextExpireTime",value="<optimized out>"},{name="xListWasEmpty",value="<optimized out>"}],file="C:/msys64/home/Haoyan.Li/esp/esp-idf/components/freertos/timers.c",fullname="C:\\msys64\\home\\Haoyan.Li\\esp\\esp-idf\\components\\freertos\\timers.c",line="588"},state="stopped"},{id="3",target-id="Thread 1073436916",details="IDLE",frame={level="0",addr="0x40084948",func="prvIdleTask",args=[{name="pvParameters",value="0x0"}],file="C:/msys64/home/Haoyan.Li/esp/esp-idf/components/freertos/tasks.c",fullname="C:\\msys64\\home\\Haoyan.Li\\esp\\esp-idf\\components\\freertos\\tasks.c",line="3381"},state="stopped"},{id="2",target-id="Thread 1073438816",details="IDLE : Running @CPU1",frame={level="0",addr="0x400e0f6a",func="esp_vApplicationWaitiHook",args=[],file="C:/msys64/home/Haoyan.Li/esp/esp-idf/components/esp32/freertos_hooks.c",fullname="C:\\msys64\\home\\Haoyan.Li\\esp\\esp-idf\\components\\esp32\\freertos_hooks.c",line="66"},state="stopped"},{id="1",target-id="Thread 1073434884",details="main : Running @CPU0",frame={level="0",addr="0x400d20a4",func="app_main",args=[],file="C:/msys64/home/Haoyan.Li/esp/hello_world/main/hello_world_main.c",fullname="C:\\msys64\\home\\Haoyan.Li\\esp\\hello_world\\main\\hello_world_main.c",line="17"},state="stopped"}],current-thread-id="1"
+(gdb)
