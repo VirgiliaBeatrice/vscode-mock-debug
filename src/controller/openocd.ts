@@ -73,6 +73,10 @@ export class OpenOCDDebugController extends EventEmitter implements GDBServerCon
 		];
 	}
 
+	public serverRoot(): string {
+		return this.args.msysDir;
+	}
+
 	public serverApplication(): string {
 		return Path.join(this.args.serverDir, this.args.serverExecutable);
 	}
@@ -99,14 +103,19 @@ export class OpenOCDDebugController extends EventEmitter implements GDBServerCon
 		return args;
 	}
 
+	public debuggerRoot(): string {
+		return this.args.msysDir;
+	}
+
 	public debuggerApplication(): string {
 		return Path.join(this.args.msysDir, this.args.debuggerDir, this.args.debuggerExecutable);
 	}
 
 	public debuggerArgs(): string[] {
-		// let args: string[] = [];
+		let args: string[] = ["-q", "--interpreter=mi2"];
+		args.push("-s", this.args.program);
 
-		return [];
+		return args;
 	}
 
 	public additionalEnv(): object{

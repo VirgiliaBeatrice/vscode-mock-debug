@@ -13,7 +13,8 @@
 			"outFiles": [ "${workspaceFolder}/out/**/*.js" ],
 			"sourceMaps": true,
 			"smartStep": true,
-			"trace": true
+			"trace": true,
+			"stopOnEntry": false
 		},
 		{
 			"type": "node",
