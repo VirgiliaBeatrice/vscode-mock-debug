@@ -150,6 +150,7 @@ export class ESPDebugSession extends DebugSession {
         console.info("GDB debugger started.");
         this.debugger.run();
 
+		await this.debugger.enqueueTask("gdb-set target-async on");
         await this.debugger.enqueueTask("interpreter-exec console \"target remote localhost:3333\"");
         await this.debugger.enqueueTask("interpreter-exec console \"monitor reset halt\"");
         await this.debugger.enqueueTask("break-insert -t -h app_main");
@@ -350,7 +351,38 @@ export class ESPDebugSession extends DebugSession {
         this.debugger.exit();
         this.sendEvent(new TerminatedEvent(false));
         this.sendResponse(response);
-    }
+	}
+
+	protected async pauseRequest(response: DebugProtocol.PauseResponse, args: DebugProtocol.PauseArguments): Promise<any> {
+		await this.debugger.interrupt();
+		// await this.debugger.interrupt(args.threadID);
+
+		this.sendResponse(response);
+	}
+
+	protected async continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments): Promise<any> {
+		await this.debugger.continue();
+
+		this.sendResponse(response);
+	}
+
+	protected async stepInRequest(response: DebugProtocol.StepInResponse, args: DebugProtocol.StepInArguments): Promise<any> {
+		await this.debugger.step();
+
+		this.sendResponse(response);
+	}
+
+	protected async stepOutRequest(response: DebugProtocol.StepOutResponse, args: DebugProtocol.StepOutArguments): Promise<any> {
+		await this.debugger.stepOut();
+
+		this.sendResponse(response);
+	}
+
+	protected async nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments): Promise<any> {
+		await this.debugger.next();
+
+		this.sendResponse(response);
+	}
 
     protected onQuit(response) {
         if (this.started) {

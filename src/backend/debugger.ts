@@ -57,7 +57,7 @@ export class GDBDebugger extends BackendService implements IBackendService
         // this._taskQ = [];
     }
 
-    public enqueueTask(cmd: string): Promise<any> {
+    public enqueueTask(cmd: string, priority?: boolean): Promise<any> {
 
         // wait for completing
         return new Promise(
@@ -71,8 +71,13 @@ export class GDBDebugger extends BackendService implements IBackendService
                     token: this.incToken,
                     cmd: cmd,
                     onFinished: notify
-                };
-                this._taskQ.push(task);
+				};
+				if (priority) {
+					this._taskQ.unshift(task);
+				}
+				else {
+					this._taskQ.push(task);
+				}
 
             }
         );
@@ -247,7 +252,7 @@ export class GDBDebugger extends BackendService implements IBackendService
             this._breakpoints.set(path, [ bp ]);
         }
 
-        let result = await this.executeCommand(`break-insert ${path}:${bp.line} `);
+        let result = await this.enqueueTask(`break-insert ${path}:${bp.line} `);
 
         return result;
     }
@@ -278,7 +283,7 @@ export class GDBDebugger extends BackendService implements IBackendService
     public clearBreakpoint(number: number): Promise<any> {
         return new Promise(
             async (resolve, reject) => {
-                let result = await this.executeCommand(`break-delete ${number}`);
+                let result = await this.enqueueTask(`break-delete ${number}`);
 
                 if (result.isDone) {
                     resolve(result);
@@ -290,15 +295,15 @@ export class GDBDebugger extends BackendService implements IBackendService
         );
     }
 
-    public async getThreads(threadId?: number): Promise<any> {
+    public async getThreads(threadID?: number): Promise<any> {
         let result = await this.enqueueTask(`thread-info`);
         // let result = await this.executeCommand(`thread-info`);
 
         return result;
     }
 
-    public async getBacktrace(threadId?: number): Promise<any> {
-        await this.enqueueTask(`thread-select ${threadId}`);
+    public async getBacktrace(threadID?: number): Promise<any> {
+        await this.enqueueTask(`thread-select ${threadID}`);
         let result = await this.enqueueTask("stack-list-frames");
 
         return result;
@@ -309,11 +314,44 @@ export class GDBDebugger extends BackendService implements IBackendService
         // let result = await this.enqueueTask(`stack-list`)
     }
 
-    public async getVariables(threadId: number, frameId: number): Promise<any> {
-        let result = await this.enqueueTask(`stack-list-variables --thread ${threadId} --frame ${frameId} --simple-values`);
+    public async getVariables(threadID: number, frameId: number): Promise<any> {
+        let result = await this.enqueueTask(`stack-list-variables --thread ${threadID} --frame ${frameId} --simple-values`);
 
         return result;
-    }
+	}
+
+	public async interrupt(threadID?: number): Promise<any> {
+		// Request "Interrupt" has the highest priority,
+		// "isRunning" state will be ignored.
+		this.isRunning = false;
+		let result = await this.enqueueTask(`exec-interrupt`, true);
+
+		return result;
+	}
+
+	public async continue(threadID?: number): Promise<any> {
+		let result = await this.enqueueTask(`exec-continue`);
+
+		return result;
+	}
+
+	public async step(): Promise<any> {
+		let result = await this.enqueueTask(`exec-step`);
+
+		return result;
+	}
+
+	public async stepOut(): Promise<any> {
+		let result = await this.enqueueTask(`exec-finish`);
+
+		return result;
+	}
+
+	public async next(): Promise<any> {
+		let result = await this.enqueueTask(`exec-next`);
+
+		return result;
+	}
 }
 
 interface Breakpoint {
