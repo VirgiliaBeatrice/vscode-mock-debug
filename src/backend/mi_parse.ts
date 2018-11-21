@@ -505,7 +505,7 @@ export function parseMI(output: string): Array<any> {
         str = str.replace(quotationRegExp, "");
         str = str.replace(newlineRegExp, "\n");
         str = str.replace(tabRegExp, "\t");
-        // str.replace(backslashRegExp, "\\");
+        str = str.replace(backslashRegExp, "\\");
 
         return str;
     };
