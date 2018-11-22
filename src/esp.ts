@@ -1,7 +1,7 @@
 import { DebugProtocol } from "vscode-debugprotocol";
 // import { EventEmitter } from "events";
 // import * as ChildProcess from "child_process";
-import { DebugSession, TerminatedEvent, InitializedEvent, Event, Breakpoint, StoppedEvent, Thread, StackFrame, Scope, Variable, Source } from "vscode-debugadapter";
+import { DebugSession, TerminatedEvent, InitializedEvent, Event, Breakpoint, StoppedEvent, Thread, StackFrame, Scope, Variable, Source, Handles } from "vscode-debugadapter";
 import { BackendService } from "./backend/service";
 import { GDBServerController, LaunchConfigurationArgs } from "./controller/gdb";
 import { OpenOCDDebugController } from "./controller/openocd";
@@ -29,6 +29,9 @@ export class AdapterOutputEvent extends Event {
         super('adapter-output', { content: content, type: type, source: source });
     }
 }
+
+const STACK_HANDLES_START = 1000;
+const VAR_HANDLES_START = 512 * 256 + STACK_HANDLES_START;
 
 export class ESPDebugSession extends DebugSession {
     private server: BackendService;
@@ -151,6 +154,7 @@ export class ESPDebugSession extends DebugSession {
         this.debugger.run();
 
 		await this.debugger.enqueueTask("gdb-set target-async on");
+        await this.debugger.enqueueTask("enable-pretty-printing");
         await this.debugger.enqueueTask("interpreter-exec console \"target remote localhost:3333\"");
         await this.debugger.enqueueTask("interpreter-exec console \"monitor reset halt\"");
         await this.debugger.enqueueTask("break-insert -t -h app_main");
@@ -234,9 +238,12 @@ export class ESPDebugSession extends DebugSession {
         return record.threads.map(
             (thread) =>
             {
+                let id = parseInt(thread["id"]);
+                let name = `Thread #${id} ${RegExp(/([0-9]+)/).exec(thread["target-id"])[0]}`;
+
                 return new Thread(
-                    parseInt(thread["id"]),
-                    thread["target-id"]
+                    id,
+                    name
                 );
             }
         );
@@ -264,31 +271,33 @@ export class ESPDebugSession extends DebugSession {
         );
     }
 
-    static CreateStackFrames(record: MIResultBacktrace): Array<DebugProtocol.StackFrame> {
+    // Maximum depth of frame to 256.
+    static ToFrameID(threadID: number, level: number): number {
+        return threadID << 8 | level;
+    }
+
+    static FromFrameID(frameID: number): [number, number] {
+        return [ frameID >> 8, frameID & 0xff ];
+    }
+
+    static CreateStackFrames(record: MIResultBacktrace, threadID: number): Array<DebugProtocol.StackFrame> {
         return record.stack.map(
-            (stack) => {
+            (element) => {
                 let stackframe = new StackFrame(
-                    parseInt(stack.frame["level"]),
-                    stack.frame["func"]
+                    ESPDebugSession.ToFrameID(threadID, parseInt(element.frame["level"])),
+                    element.frame["func"] + "@" + element.frame["addr"]
                 );
 
-                if (stack.frame.hasOwnProperty("file"))
+                if (element.frame.hasOwnProperty("file"))
                 {
-                    stackframe.source = ESPDebugSession.CreateSource(stack.frame);
-                    stackframe.line = parseInt(stack.frame["line"]);
+                    stackframe.source = ESPDebugSession.CreateSource(element.frame);
+                    stackframe.line = parseInt(element.frame["line"]);
 
                     return stackframe;
                 }
                 else {
                     return stackframe;
                 }
-
-                // return new StackFrame(
-                // 	parseInt(frame["level"]),
-                // 	frame["file"],
-                // 	ESPDebugSession.CreateSource(frame),
-                // 	parseInt(frame["line"])
-                // );
             }
         );
     }
@@ -301,8 +310,7 @@ export class ESPDebugSession extends DebugSession {
         this.selectedThreadId = args.threadId;
 
         response.body = {
-            stackFrames: ESPDebugSession.CreateStackFrames(record),
-            totalFrames: 3
+            stackFrames: ESPDebugSession.CreateStackFrames(record, this.selectedThreadId)
         };
         this.sendResponse(response);
     }
@@ -313,30 +321,54 @@ export class ESPDebugSession extends DebugSession {
 
         response.body = {
             scopes: [
-                new Scope("Global", 1, true),
-                new Scope("Local", 2, false)
+                new Scope("Local", this.selectedFrameId + STACK_HANDLES_START, false),
+                // new Scope("Global", 254, true),
+                // new Scope("Static", 65536 + this.selectedFrameId, false)
             ]
         };
         this.sendResponse(response);
     }
 
-    static CreateVariables(record) {
+    public variableHandles = new Handles<string>();
+
+    private createVariables(record): DebugProtocol.Variable[] {
         return record.variables.map(
-            (variable) => {
-                return new Variable(
-                    variable.name,
-                    variable.value
-                );
+            (variable: Object) => {
+                let ref = this.variableHandles.create(variable["name"]);
+
+                if (variable.hasOwnProperty("value")) {
+                    return {
+                        name: variable["name"],
+                        type: variable["type"],
+                        value: variable["value"],
+                        variablesReference: ref
+                    };
+                }
+                else {
+                    return {
+                        name: variable["name"],
+                        type: variable["type"],
+                        value: "<unknown>",
+                        variablesReference: ref
+                    };
+                }
+                // return new Variable(
+                //     variable.name,
+                //     variable.type
+                // );
             }
         );
     }
 
     protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments): Promise<void>
     {
-        let record = await this.debugger.getVariables(this.selectedThreadId, this.selectedFrameId);
+        let frameID: number = args.variablesReference - STACK_HANDLES_START;
+        let [threadId, level] = ESPDebugSession.FromFrameID(frameID);
+        let record = await this.debugger.getVariables(threadId, level);
+        // let variables: DebugProtocol.Variable[] = this.createVariables(record);
 
         response.body = {
-            variables: ESPDebugSession.CreateVariables(record)
+            variables: this.createVariables(record)
         };
 
         this.sendResponse(response);

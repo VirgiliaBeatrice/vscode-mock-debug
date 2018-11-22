@@ -7,6 +7,6 @@
         "semicolon": true,
         "triple-equals": true,
         "no-var-keyword": true,
-        "no-bitwise": true
+        "no-bitwise": false
     }
 }
