@@ -230,7 +230,7 @@ export class ESPDebugSession extends DebugSession {
 
     protected async setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments): Promise<any> {
 
-        const path: string = args.source.path;
+        const path: string = Path.normalize(args.source.path);
         const currentBreakpoints: DebugProtocol.SourceBreakpoint[] = args.breakpoints || [];
 
         if (!this.isDebugReady){
