@@ -225,6 +225,9 @@ export class ESPDebugSession extends DebugSession {
         this.sendResponse(result);
     }
 
+    public breakpointMap = new Map<string, number[]>();
+    public breakpointHandles = new Handles<DebugProtocol.Breakpoint>(2);
+
     protected async setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments): Promise<any> {
 
         const path: string = args.source.path;
@@ -236,17 +239,24 @@ export class ESPDebugSession extends DebugSession {
         }
 
         // Clear all bps for this file.
-        await this.debugger.clearBreakpoints(path);
+        await this.debugger.clearBreakpoints(this.breakpointMap.get(path) || []);
 
         // Set and verify bp locations.
-        const actualBreakpoints = currentBreakpoints.map(
-            (bp) => {
-                this.debugger.setBreakpoint(path, bp);
+        let handles = [];
+        let actualBreakpoints = await Promise.all(
+            currentBreakpoints.map(
+                async (bp) => {
+                    let result = await this.debugger.setBreakpoint(path, bp);
+                    let returnBp = new Breakpoint(true, result["line"]);
 
-                let returnBp = new Breakpoint(true);
-                return returnBp;
-            }
+                    handles.push(this.breakpointHandles.create(returnBp));
+
+                    return returnBp;
+                }
+            )
         );
+
+        this.breakpointMap.set(path, handles);
 
         response.body = {
             breakpoints: actualBreakpoints
@@ -291,7 +301,7 @@ export class ESPDebugSession extends DebugSession {
     private createSource(frame: any): Source {
         return new Source(
             Path.basename(frame["file"]),
-            this.convertDebuggerPathToClient(frame["fullname"])
+            frame["fullname"]
         );
     }
 
@@ -726,6 +736,8 @@ export class Handles<T> {
     public hasIdentity(identity: string): boolean {
         return this._handleMapReverse.has(identity);
     }
+
+    // public toHandleArray()
 }
 
 DebugSession.run(ESPDebugSession);

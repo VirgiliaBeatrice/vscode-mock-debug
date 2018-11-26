@@ -245,31 +245,26 @@ export class GDBDebugger extends BackendService implements IBackendService
 
     public async setBreakpoint(path: string, bp: DebugProtocol.SourceBreakpoint): Promise<any>
     {
-        if (this._breakpoints.has(path)) {
-            this._breakpoints.get(path).push(bp);
-        }
-        else {
-            this._breakpoints.set(path, [ bp ]);
-        }
+        // if (this._breakpoints.has(path)) {
+        //     this._breakpoints.get(path).push(bp);
+        // }
+        // else {
+        //     this._breakpoints.set(path, [ bp ]);
+        // }
 
         let result = await this.enqueueTask(`break-insert ${path}:${bp.line} `);
 
         return result;
     }
 
-    public clearBreakpoints(path: string): void {
-        let bps = this._breakpoints.get(path) || [];
+    public async clearBreakpoints(bps: Array<number>): Promise<any> {
+        let deleteTasks = await Promise.all(
+            bps.map(
+                async (bp) => {
 
-        let deleteTasks = bps.map(
-            (bp) => {
-                this.clearBreakpoint(1);
-            }
-        );
-
-        Promise.all(deleteTasks).then(
-            () => {
-                return false;
-            }
+                    await this.clearBreakpoint(bp);
+                }
+            )
         );
 
         // return new Promise(
@@ -280,19 +275,22 @@ export class GDBDebugger extends BackendService implements IBackendService
         // );
     }
 
-    public clearBreakpoint(number: number): Promise<any> {
-        return new Promise(
-            async (resolve, reject) => {
-                let result = await this.enqueueTask(`break-delete ${number}`);
+    public async clearBreakpoint(number: number): Promise<any> {
+        let result = await this.enqueueTask(`break-delete ${number}`);
 
-                if (result.isDone) {
-                    resolve(result);
-                }
-                else {
-                    reject(false);
-                }
-            }
-        );
+        return result;
+        // return new Promise(
+        //     async (resolve, reject) => {
+        //         let result = await this.enqueueTask(`break-delete ${number}`);
+
+        //         if (result.isDone) {
+        //             resolve(result);
+        //         }
+        //         else {
+        //             reject(false);
+        //         }
+        //     }
+        // );
     }
 
     public async getThreads(threadID?: number): Promise<any> {
