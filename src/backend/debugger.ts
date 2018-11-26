@@ -314,11 +314,30 @@ export class GDBDebugger extends BackendService implements IBackendService
         // let result = await this.enqueueTask(`stack-list`)
     }
 
-    public async getVariables(threadID: number, frameId: number): Promise<any> {
+    public async getStackVariables(threadID: number, frameId: number): Promise<any> {
         let result = await this.enqueueTask(`stack-list-variables --thread ${threadID} --frame ${frameId} --simple-values`);
 
         return result;
-	}
+    }
+
+    public async createVariableObject(varName: string, varExp: string): Promise<any> {
+        let result = await this.enqueueTask(`var-create ${varName} * ${varExp}`);
+
+        return result;
+
+    }
+
+    public async updateVariableObjects(): Promise<any> {
+        let result = await this.enqueueTask(`var-update --all-values *`);
+
+        return result;
+    }
+
+    public async getVariableChildren(varName: string): Promise<any> {
+        let result = await this.enqueueTask(`var-list-children --simple-values ${varName}`);
+
+        return result;
+    }
 
 	public async interrupt(threadID?: number): Promise<any> {
 		// Request "Interrupt" has the highest priority,

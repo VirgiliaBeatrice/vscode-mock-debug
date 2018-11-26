@@ -1,14 +1,16 @@
 import { DebugProtocol } from "vscode-debugprotocol";
 // import { EventEmitter } from "events";
 // import * as ChildProcess from "child_process";
-import { DebugSession, TerminatedEvent, InitializedEvent, Event, Breakpoint, StoppedEvent, Thread, StackFrame, Scope, Variable, Source, Handles } from "vscode-debugadapter";
+import { DebugSession, TerminatedEvent, InitializedEvent, Event, Breakpoint, StoppedEvent, Thread, StackFrame, Scope, Variable, Source } from "vscode-debugadapter";
+import * as DebugAdapter from "vscode-debugadapter";
 import { BackendService } from "./backend/service";
 import { GDBServerController, LaunchConfigurationArgs } from "./controller/gdb";
 import { OpenOCDDebugController } from "./controller/openocd";
 import { GDBDebugger, DebuggerEvents } from "./backend/debugger";
 import { GDBServer } from "./backend/server";
 import { Subject } from "await-notify";
-import { MIResultThread, MIResultBacktrace } from "./backend/mi";
+import { MIResultThread, MIResultBacktrace, MIResultCreateVaraibleObject, MIResultListChildren, MIResultChildInfo, MIResultChangeListInfo, MIResultStackVariables } from "./backend/mi";
+import * as Path from "path";
 
 export interface OpenOCDArgments {
     cwd: string;
@@ -30,8 +32,9 @@ export class AdapterOutputEvent extends Event {
     }
 }
 
-const STACK_HANDLES_START = 1000;
-const VAR_HANDLES_START = 512 * 256 + STACK_HANDLES_START;
+// const STACK_HANDLES_START = 0;
+// const FRAME_HANDLES_START = 256;
+const VAR_HANDLES_START = 256 * 256;
 
 export class ESPDebugSession extends DebugSession {
     private server: BackendService;
@@ -54,6 +57,7 @@ export class ESPDebugSession extends DebugSession {
 
         this.setDebuggerLinesStartAt1(false);
         this.setDebuggerColumnsStartAt1(false);
+        this.setDebuggerPathFormat("native");
 
 
 
@@ -202,6 +206,25 @@ export class ESPDebugSession extends DebugSession {
 
     }
 
+    protected async evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): Promise<any> {
+
+        let context = args.context;
+        let result= undefined;
+
+        switch(context) {
+            case "repl":
+                result = await this.debugger.enqueueTask(args.expression);
+                break;
+        }
+
+        response.body = {
+            result: JSON.stringify(result),
+            variablesReference: 0
+        };
+
+        this.sendResponse(result);
+    }
+
     protected async setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments): Promise<any> {
 
         const path: string = args.source.path;
@@ -238,6 +261,7 @@ export class ESPDebugSession extends DebugSession {
         return record.threads.map(
             (thread) =>
             {
+                // Default starts from one, change it starts from zero.
                 let id = parseInt(thread["id"]);
                 let name = `Thread #${id} ${RegExp(/([0-9]+)/).exec(thread["target-id"])[0]}`;
 
@@ -264,23 +288,24 @@ export class ESPDebugSession extends DebugSession {
         this.sendResponse(response);
     }
 
-    static CreateSource(frame: any): Source {
+    private createSource(frame: any): Source {
         return new Source(
-            frame["file"],
-            frame["fullname"]
+            Path.basename(frame["file"]),
+            this.convertDebuggerPathToClient(frame["fullname"])
         );
     }
 
     // Maximum depth of frame to 256.
+    // Maximun number of threads to 256.
     static ToFrameID(threadID: number, level: number): number {
         return threadID << 8 | level;
     }
 
     static FromFrameID(frameID: number): [number, number] {
-        return [ frameID >> 8, frameID & 0xff ];
+        return [ (frameID >> 8) & 0xff, frameID & 0xff ];
     }
 
-    static CreateStackFrames(record: MIResultBacktrace, threadID: number): Array<DebugProtocol.StackFrame> {
+    private createStackFrames(record: MIResultBacktrace, threadID: number): Array<DebugProtocol.StackFrame> {
         return record.stack.map(
             (element) => {
                 let stackframe = new StackFrame(
@@ -290,7 +315,7 @@ export class ESPDebugSession extends DebugSession {
 
                 if (element.frame.hasOwnProperty("file"))
                 {
-                    stackframe.source = ESPDebugSession.CreateSource(element.frame);
+                    stackframe.source = this.createSource(element.frame);
                     stackframe.line = parseInt(element.frame["line"]);
 
                     return stackframe;
@@ -310,7 +335,7 @@ export class ESPDebugSession extends DebugSession {
         this.selectedThreadId = args.threadId;
 
         response.body = {
-            stackFrames: ESPDebugSession.CreateStackFrames(record, this.selectedThreadId)
+            stackFrames: this.createStackFrames(record, this.selectedThreadId)
         };
         this.sendResponse(response);
     }
@@ -321,7 +346,7 @@ export class ESPDebugSession extends DebugSession {
 
         response.body = {
             scopes: [
-                new Scope("Local", this.selectedFrameId + STACK_HANDLES_START, false),
+                new Scope("Local", this.selectedFrameId, false),
                 // new Scope("Global", 254, true),
                 // new Scope("Static", 65536 + this.selectedFrameId, false)
             ]
@@ -329,46 +354,214 @@ export class ESPDebugSession extends DebugSession {
         this.sendResponse(response);
     }
 
-    public variableHandles = new Handles<string>();
+    public variableHandles = new Handles<VariableObject>(VAR_HANDLES_START);
 
-    private createVariables(record): DebugProtocol.Variable[] {
-        return record.variables.map(
-            (variable: Object) => {
-                let ref = this.variableHandles.create(variable["name"]);
+    private async updateVariables(): Promise<any> {
+        let result = await this.debugger.updateVariableObjects();
 
-                if (variable.hasOwnProperty("value")) {
-                    return {
-                        name: variable["name"],
-                        type: variable["type"],
-                        value: variable["value"],
-                        variablesReference: ref
-                    };
-                }
-                else {
-                    return {
-                        name: variable["name"],
-                        type: variable["type"],
-                        value: "<unknown>",
-                        variablesReference: ref
-                    };
-                }
-                // return new Variable(
-                //     variable.name,
-                //     variable.type
-                // );
+        result["changelist"].forEach(
+            (element) => {
+                let varObj = this.variableHandles.getValueFromIdentity(element["name"]);
+                varObj.update(element);
             }
         );
     }
 
+    private async createStackVariables(record: MIResultStackVariables): Promise<any> {
+        let variables = record["variables"];
+
+        await this.updateVariables();
+
+        let ret = await Promise.all(
+            variables.map(
+                async (variable: Object) => {
+                    let varExp = variable["name"];
+                    let varName = `Local_Var_(${varExp})`;
+                    let varObj: VariableObject = undefined;
+                    let ref: number = 0;
+
+                    if(this.variableHandles.hasIdentity(varName)) {
+                        varObj = this.variableHandles.getValueFromIdentity(varName);
+                        ref = this.variableHandles.getHandleFromIdentity(varName);
+                    }
+                    else {
+                        let result = await this.debugger.createVariableObject(varName, varExp);
+                        varObj = new VariableObject(result, varExp);
+                        ref = this.variableHandles.create(varObj, varName);
+                    }
+
+                    return varObj.toProtocolVariable(ref);
+                }
+            )
+        );
+
+        return ret;
+    }
+
+    private async createVariableChildren(record: MIResultListChildren): Promise<any> {
+        // await this.updateVariables();
+
+        if (record["numchild"] === "0") {
+            return Promise.resolve([]);
+        }
+
+        let children = record["children"];
+
+        let ret = await Promise.all(
+            children.map(
+                async (element) => {
+                    let child = element["child"];
+                    let varName = child["name"];
+                    let varObj = undefined;
+                    let ref = 0;
+
+                    if (this.variableHandles.hasIdentity(varName)) {
+                        varObj = this.variableHandles.getValueFromIdentity(varName);
+                        ref = this.variableHandles.getHandleFromIdentity(varName);
+                    }
+                    else {
+                        varObj = new VariableObject(child);
+                        ref = this.variableHandles.create(varObj, varName);
+                    }
+
+                    return varObj.toProtocolVariable(ref);
+                }
+            )
+        );
+
+        return ret;
+    }
+
+    // private async createVariables(record: any): Promise<any> {
+    //     let variables = [];
+    //     let ret = undefined;
+
+    //     if (record.hasOwnProperty("numchild")) {
+    //         if (record["numchild"] === "0")
+    //         {
+    //             return Promise.resolve([]);
+    //         }
+    //         variables = record["children"].map(
+    //             (element) => {
+    //                 return element.child;
+    //             }
+    //         );
+    //         ret = await Promise.all(
+    //             variables.map(
+    //                 async (variable: Object) => {
+    //                     let varName = variable["name"];
+    //                     let varExp = variable["exp"];
+    //                     // let result = await this.debugger.createVariableObject(varName, varExp);
+    //                     let varObj = new VariableObject(variable);
+    //                     let ref = varObj.numChild === 0 ? 0 : this.variableHandles.create(varObj);
+
+    //                     if (variable.hasOwnProperty("value")) {
+    //                         return {
+    //                             name: varExp,
+    //                             type: variable["type"],
+    //                             value: variable["value"],
+    //                             variablesReference: ref
+    //                         };
+    //                     }
+    //                     else {
+    //                         return {
+    //                             name: variable["name"],
+    //                             type: variable["type"],
+    //                             value: "<unknown>",
+    //                             variablesReference: ref
+    //                         };
+    //                     }
+    //                 }
+    //             )
+    //         );
+    //     }
+    //     else {
+    //         variables = record["variables"];
+
+    //         // Update all variables
+    //         let result = await this.debugger.updateVariableObjects();
+
+    //         result["changelist"].forEach(
+    //             (element) => {
+    //                 let varObj = this.variableHandles.getValueFromIdentity(element["name"]);
+    //                 varObj.update(element);
+    //             }
+    //         );
+
+    //         ret = await Promise.all(
+    //             variables.map(
+    //                 async (variable: Object) => {
+    //                     let varExp = variable["name"];
+    //                     let varName = `Local_Var_(${varExp})`;
+    //                     let varObj: VariableObject = undefined;
+    //                     let ref: number = 0;
+
+    //                     if(this.variableHandles.hasIdentity(varName)) {
+    //                         varObj = this.variableHandles.getValueFromIdentity(varName);
+    //                         ref = this.variableHandles.getHandleFromIdentity(varName);
+    //                     }
+    //                     else {
+    //                         let result = await this.debugger.createVariableObject(varName, varExp);
+    //                         varObj = new VariableObject(result);
+    //                         ref = this.variableHandles.create(varObj);
+    //                     }
+
+    //                     return varObj.toProtocolVariable(ref);
+    //                     // let ref = varObj.numChild === 0 ? 0 : this.variableHandles.create(varObj);
+
+    //                     // if (variable.hasOwnProperty("value")) {
+    //                     //     return {
+    //                     //         name: variable["name"],
+    //                     //         type: variable["type"],
+    //                     //         value: variable["value"],
+    //                     //         variablesReference: ref
+    //                     //     };
+    //                     // }
+    //                     // else {
+    //                     //     return {
+    //                     //         name: variable["name"],
+    //                     //         type: variable["type"],
+    //                     //         value: "<unknown>",
+    //                     //         variablesReference: ref
+    //                     //     };
+    //                     // }
+    //                 }
+    //             )
+    //         );
+    //     }
+
+    //     return ret;
+
+    // }
+
     protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments): Promise<void>
     {
-        let frameID: number = args.variablesReference - STACK_HANDLES_START;
-        let [threadId, level] = ESPDebugSession.FromFrameID(frameID);
-        let record = await this.debugger.getVariables(threadId, level);
+        let id: number = 0;
+        let record = undefined;
+        let variables: Variable[] = undefined;
+
+        if (args.variablesReference < VAR_HANDLES_START) {
+            // Stack Variables Req.
+            let frameID: number = args.variablesReference;
+            let [threadId, level] = ESPDebugSession.FromFrameID(frameID);
+            record = await this.debugger.getStackVariables(threadId, level);
+
+            variables = await this.createStackVariables(record);
+        }
+        else {
+            // Variable Member Req.
+            let varID: VariableObject = this.variableHandles.get(args.variablesReference);
+            record = await this.debugger.getVariableChildren(varID.name);
+
+            variables = await this.createVariableChildren(record);
+            // record = await this.debugger.getVariableMember(varID);
+        }
+
+        // let frameID: number = args.variablesReference - STACK_HANDLES_START;
         // let variables: DebugProtocol.Variable[] = this.createVariables(record);
 
         response.body = {
-            variables: this.createVariables(record)
+            variables: variables
         };
 
         this.sendResponse(response);
@@ -432,6 +625,106 @@ export class ESPDebugSession extends DebugSession {
 
     protected onLaunchError(err: number, response) {
         this.sendErrorResponse(response, 103, `Fail to launch ${this.controller.name} GDB Server: ${err.toString()}`);
+    }
+}
+
+class VariableObject {
+    public name: string;
+    public exp: string;
+    public numChild: number;
+    public value: any;
+    public type: string;
+    public threadID: number;
+    public hasMore?: number;
+
+    constructor(record: MIResultCreateVaraibleObject | MIResultChildInfo, exp?: string) {
+        this.name = record["name"];
+
+        // TODO: Should have an appropriate method.
+        if (exp) {
+            this.exp = exp;
+        }
+        else {
+            this.exp = record["exp"];
+        }
+
+        this.numChild = parseInt(record["numchild"]);
+        this.value = record["value"];
+        this.type = record["type"];
+        this.threadID = parseInt(record["thread-id"]);
+
+        if (record.hasOwnProperty("has_more")) {
+            this.hasMore = parseInt(record["has_more"]);
+        }
+    }
+
+    public update(record: MIResultChangeListInfo) {
+        this.name = record["name"];
+        this.value = record["value"];
+        // this.numChild = record["new_num_children"];
+    }
+
+    public toProtocolVariable(ref: number): DebugProtocol.Variable {
+
+        return {
+            name: this.exp,
+            // identity: this.name,
+            type: this.type,
+            value: this.value,
+            variablesReference: this.numChild === 0? 0 : ref
+        };
+    }
+}
+
+export class Handles<T> {
+
+	private START_HANDLE = 1000;
+
+	private _nextHandle : number;
+    private _handleMap = new Map<number, T>();
+    // private _handleIdentitySet = new Set<string>();
+    private _handleMapReverse = new Map<T | string, number>();
+
+	public constructor(startHandle?: number) {
+		this._nextHandle = typeof startHandle === 'number' ? startHandle : this.START_HANDLE;
+	}
+
+	public reset(): void {
+		this._nextHandle = this.START_HANDLE;
+        this._handleMap = new Map<number, T>();
+        this._handleMapReverse = new Map<T | string, number>();
+        // this._handleIdentitySet = new Set<string>();
+	}
+
+	public create(value: T, identity?: string): number {
+		let handle = this._nextHandle++;
+        this._handleMap.set(handle, value);
+        if (identity) {
+            this._handleMapReverse.set(identity, handle);
+        }
+        else {
+            this._handleMapReverse.set(value, handle);
+        }
+        // if (identity) {
+        //     this._handleIdentitySet.add(identity);
+        // }
+		return handle;
+	}
+
+	public get(handle: number, dflt?: T): T {
+		return this._handleMap.get(handle) || dflt;
+    }
+
+    public getValueFromIdentity(identity: string): T {
+        return this._handleMapReverse.has(identity)? this._handleMap.get((this._handleMapReverse.get(identity))) : undefined;
+    }
+
+    public getHandleFromIdentity(identity: string): number {
+        return this._handleMapReverse.has(identity)? (this._handleMapReverse.get(identity)) : undefined;
+    }
+
+    public hasIdentity(identity: string): boolean {
+        return this._handleMapReverse.has(identity);
     }
 }
 
