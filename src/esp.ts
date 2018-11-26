@@ -150,7 +150,7 @@ export class ESPDebugSession extends DebugSession {
             e.body.allThreadsStopped = true;
 
             this.sendEvent(e);
-            console.log("Send a stop event.");
+            console.log(`Send a stop event. Thread: ${threadId}`);
         });
 
         await this.debugger.start();
@@ -287,12 +287,12 @@ export class ESPDebugSession extends DebugSession {
         if (!this.isDebugReady)
         {
             await this._debuggerReady.wait(60000);
-            this.isDebugReady = true;
+            // this.isDebugReady = true;
         }
         let record: MIResultThread = await this.debugger.getThreads();
 
         response.body = {
-            threads: ESPDebugSession.CreateThreads(record)
+            threads: ESPDebugSession.CreateThreads(record).reverse()
         };
 
         this.sendResponse(response);
@@ -602,13 +602,13 @@ export class ESPDebugSession extends DebugSession {
 	}
 
 	protected async stepInRequest(response: DebugProtocol.StepInResponse, args: DebugProtocol.StepInArguments): Promise<any> {
-		await this.debugger.step();
+		await this.debugger.step(args.threadId);
 
 		this.sendResponse(response);
 	}
 
 	protected async stepOutRequest(response: DebugProtocol.StepOutResponse, args: DebugProtocol.StepOutArguments): Promise<any> {
-		await this.debugger.stepOut();
+		await this.debugger.stepOut(args.threadId);
 
 		this.sendResponse(response);
 	}

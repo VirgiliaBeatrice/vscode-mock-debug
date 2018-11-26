@@ -302,7 +302,7 @@ export class GDBDebugger extends BackendService implements IBackendService
 
     public async getBacktrace(threadID?: number): Promise<any> {
         await this.enqueueTask(`thread-select ${threadID}`);
-        let result = await this.enqueueTask("stack-list-frames");
+        let result = await this.enqueueTask("stack-list-frames", true);
 
         return result;
     }
@@ -352,14 +352,16 @@ export class GDBDebugger extends BackendService implements IBackendService
 		return result;
 	}
 
-	public async step(): Promise<any> {
-		let result = await this.enqueueTask(`exec-step`);
+	public async step(threadID: number): Promise<any> {
+        await this.enqueueTask(`thread-select ${threadID}`);
+		let result = await this.enqueueTask(`exec-step`, true);
 
 		return result;
 	}
 
-	public async stepOut(): Promise<any> {
-		let result = await this.enqueueTask(`exec-finish`);
+	public async stepOut(threadID: number): Promise<any> {
+        await this.enqueueTask(`thread-select ${threadID}`);
+		let result = await this.enqueueTask(`exec-finish`, true);
 
 		return result;
 	}
