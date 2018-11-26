@@ -83,11 +83,6 @@ export class ESPDebugSession extends DebugSession {
         this.args = args;
         // this.controller.on('event', this.controllerEvent.bind(this));
 
-        const serverExecutable = "C:\\msys32\\mingw32\\bin\\openocd.exe";
-        // const serverExecutable = "C:\\msys32\\usr\\bin\\bash.exe";
-        const serverArgs = [];
-        // const initMatchRegex = /a*/g;
-
         this.quit = false;
         this.started = false;
         this.isDebugReady = false;
@@ -105,13 +100,6 @@ export class ESPDebugSession extends DebugSession {
             // "."
         );
 
-        // this.server = new BackendService(
-        // 	"Subprocess for Server Instance",
-        // 	this.controller.serverApplication(),
-        // 	this.controller.serverArgs(),
-        // 	this.controller.additionalEnv()
-        // );
-        // this.server = new GDBServer(this.controller.serverApplication(), this.controller.serverArgs());
         this.server.on('output', (output, source) => {this.sendEvent(new AdapterOutputEvent(output, 'out', source));});
         this.server.on('quit', this.onQuit.bind(this));
         this.server.on('launcherror', this.onLaunchError.bind(this));
@@ -122,21 +110,6 @@ export class ESPDebugSession extends DebugSession {
         await this.server.start();
         console.info("OpenOCD server started.");
 
-        // this.server.start().then(
-        // 	() => {
-        // 		console.info("OpenOCD server started.");
-        // 	},
-        // 	() => {
-        // 		this.server.emit('lauhcherror', 103, response);
-        // 	}
-        // );
-
-        // TODO: Run debugger
-        // this.debugger = new BackendService(
-        // 	"Subprocess for Debugger Instance",
-        // 	this.controller.debuggerApplication(),
-        // 	this.controller.debuggerArgs()
-        // );
         this.debugger = new GDBDebugger(
             this.controller.debuggerApplication(),
             this.controller.debuggerArgs(),
@@ -441,108 +414,6 @@ export class ESPDebugSession extends DebugSession {
 
         return ret;
     }
-
-    // private async createVariables(record: any): Promise<any> {
-    //     let variables = [];
-    //     let ret = undefined;
-
-    //     if (record.hasOwnProperty("numchild")) {
-    //         if (record["numchild"] === "0")
-    //         {
-    //             return Promise.resolve([]);
-    //         }
-    //         variables = record["children"].map(
-    //             (element) => {
-    //                 return element.child;
-    //             }
-    //         );
-    //         ret = await Promise.all(
-    //             variables.map(
-    //                 async (variable: Object) => {
-    //                     let varName = variable["name"];
-    //                     let varExp = variable["exp"];
-    //                     // let result = await this.debugger.createVariableObject(varName, varExp);
-    //                     let varObj = new VariableObject(variable);
-    //                     let ref = varObj.numChild === 0 ? 0 : this.variableHandles.create(varObj);
-
-    //                     if (variable.hasOwnProperty("value")) {
-    //                         return {
-    //                             name: varExp,
-    //                             type: variable["type"],
-    //                             value: variable["value"],
-    //                             variablesReference: ref
-    //                         };
-    //                     }
-    //                     else {
-    //                         return {
-    //                             name: variable["name"],
-    //                             type: variable["type"],
-    //                             value: "<unknown>",
-    //                             variablesReference: ref
-    //                         };
-    //                     }
-    //                 }
-    //             )
-    //         );
-    //     }
-    //     else {
-    //         variables = record["variables"];
-
-    //         // Update all variables
-    //         let result = await this.debugger.updateVariableObjects();
-
-    //         result["changelist"].forEach(
-    //             (element) => {
-    //                 let varObj = this.variableHandles.getValueFromIdentity(element["name"]);
-    //                 varObj.update(element);
-    //             }
-    //         );
-
-    //         ret = await Promise.all(
-    //             variables.map(
-    //                 async (variable: Object) => {
-    //                     let varExp = variable["name"];
-    //                     let varName = `Local_Var_(${varExp})`;
-    //                     let varObj: VariableObject = undefined;
-    //                     let ref: number = 0;
-
-    //                     if(this.variableHandles.hasIdentity(varName)) {
-    //                         varObj = this.variableHandles.getValueFromIdentity(varName);
-    //                         ref = this.variableHandles.getHandleFromIdentity(varName);
-    //                     }
-    //                     else {
-    //                         let result = await this.debugger.createVariableObject(varName, varExp);
-    //                         varObj = new VariableObject(result);
-    //                         ref = this.variableHandles.create(varObj);
-    //                     }
-
-    //                     return varObj.toProtocolVariable(ref);
-    //                     // let ref = varObj.numChild === 0 ? 0 : this.variableHandles.create(varObj);
-
-    //                     // if (variable.hasOwnProperty("value")) {
-    //                     //     return {
-    //                     //         name: variable["name"],
-    //                     //         type: variable["type"],
-    //                     //         value: variable["value"],
-    //                     //         variablesReference: ref
-    //                     //     };
-    //                     // }
-    //                     // else {
-    //                     //     return {
-    //                     //         name: variable["name"],
-    //                     //         type: variable["type"],
-    //                     //         value: "<unknown>",
-    //                     //         variablesReference: ref
-    //                     //     };
-    //                     // }
-    //                 }
-    //             )
-    //         );
-    //     }
-
-    //     return ret;
-
-    // }
 
     protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments): Promise<void>
     {

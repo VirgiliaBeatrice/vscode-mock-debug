@@ -30,12 +30,11 @@ export class GDBDebugger extends BackendService implements IBackendService
 
     constructor(application: string, args: string[], public root?: string, public cwd?: string, public path?: string[])
     {
-        // super("Subprocess for GDB Debugger Instance", ServiceType.Debugger, application, ["-q", "--interpreter=mi2", "-s", "C:\\msys64\\home\\Haoyan.Li\\esp\\hello_world\\build\\hello-world.elf"]);
         super("Subprocess for GDB Debugger Instance", ServiceType.Debugger, application, args);
 
         if (this.root === undefined)
         {
-            this.root = "C:\\msys64";
+            this.root = "C:\\msys32";
         }
 
         if (this.path === undefined)

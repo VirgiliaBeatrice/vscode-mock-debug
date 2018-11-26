@@ -7,7 +7,7 @@ export class GDBServer extends BackendService implements IBackendService
         super("Subprocess for GDB Server Instance", ServiceType.Server, application, args);
 
         if (this.root === undefined) {
-            this.root = "C:\\msys64";
+            this.root = "C:\\msys32";
         }
 
         if (this.path === undefined) {
