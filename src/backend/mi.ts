@@ -1,4 +1,4 @@
-export interface MIResult {
+export interface MIResult extends Object {
     token: number;
     resultClass: "done" | "running" | "connected" | "error" | "exit";
     result?: Array<any>;
@@ -63,7 +63,72 @@ export interface MIResultThread extends MIResult {
 }
 
 export interface MIResultBacktrace extends MIResult {
-    stack: Array<any>;
+    stack: Array<MIResultStackInfo>;
+}
+
+export interface MIResultStackVariables extends MIResult {
+    // discriminator: "MIResultStackVariables";
+    variables: Array<MIResultVariableInfo>;
+}
+
+export interface MIResultCreateVaraibleObject extends MIResult {
+    name: string;
+    numchild: string;
+    value: string;
+    type: string;
+    "thread-id": string;
+    has_more: string;
+}
+
+export interface MIResultListChildren extends MIResult {
+    numchild: string;
+    children: Array<MIResultVariablehildrenInfo>;
+    has_more: string;
+}
+
+interface MIResultStackInfo {
+    frame: MIResultFrameInfo;
+}
+
+interface MIResultFrameInfo {
+    level: string;
+    addr: string;
+    func: string;
+    args: Array<MIResultArgsInfo>;
+    file: string;
+    fullname: string;
+    line: string;
+}
+
+interface MIResultArgsInfo {
+    name: string;
+    value: string;
+}
+
+interface MIResultVariableInfo {
+    name: string;
+    type: string;
+    value?: string;
+}
+
+interface MIResultVariablehildrenInfo {
+    child: MIResultChildInfo;
+}
+export interface MIResultChildInfo {
+    name: string;
+    exp: string;
+    numchild: string;
+    value: string;
+    type: string;
+    "thread-id": string;
+}
+
+export interface MIResultChangeListInfo {
+    name: string;
+    value: string;
+    in_scope: string;
+    type_changed: string;
+    has_more: string;
 }
 
 // function parseMITextToMIObject(miText: string): Object {

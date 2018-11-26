@@ -503,9 +503,9 @@ export function parseMI(output: string): Array<any> {
 
     let escapeString = (str: string) => {
         str = str.replace(quotationRegExp, "");
-        str = str.replace(newlineRegExp, "\n");
-        str = str.replace(tabRegExp, "\t");
-        str = str.replace(backslashRegExp, "\\");
+        // str = str.replace(newlineRegExp, "\n");
+        // str = str.replace(tabRegExp, "\t");
+        str = str.replace(backslashRegExp, "/");
 
         return str;
     };
